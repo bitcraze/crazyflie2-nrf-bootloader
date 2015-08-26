@@ -1,5 +1,5 @@
-Crazyflie 2.0 nRF51 Bootloader
-==============================
+# Crazyflie 2.0 nRF51 Bootloader [![Build Status](https://travis-ci.org/bitcraze/crazyflie2-nrf-bootloader.svg)](https://travis-ci.org/bitcraze/crazyflie2-nrf-bootloader)
+
 
 Crazflie 2.0 bootloader firmware that runs in the nRF51. See readme.md in
 crazyflie-nrf-firmware repos for more information about flash and boot
