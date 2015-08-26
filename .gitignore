@@ -14,3 +14,6 @@ config.mk
 #Nordic libs
 s110
 nrf51_sdk
+
+/cload_nrf.*
+

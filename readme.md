@@ -5,9 +5,13 @@ Crazflie 2.0 bootloader firmware that runs in the nRF51. See readme.md in
 crazyflie-nrf-firmware repos for more information about flash and boot
 architecture.
 
-Compiling with this program currently requires the nRF51_SDK and S110 packages.
-These can be downloaded from the Nordic semiconductor website. 
-See s110/readme and nrf51_sdk/readme for exact version.
+Compiling requires the nRF51_SDK and S110 packages.
+
+        ./tools/build/download_deps.sh
+
+will download the zips and unpack them.
+If you want to download manually from the Nordic semiconductor website, you
+will find the details in nrf51_sdk/readme and s110/readme.
 
 License
 -------
