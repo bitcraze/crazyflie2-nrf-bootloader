@@ -1,4 +1,7 @@
 
+#Put your personal build config in config.mk and DO NOT COMMIT IT!
+-include config.mk
+
 BLE ?= 1
 
 CROSS_COMPILE=arm-none-eabi-
@@ -12,6 +15,7 @@ OPENOCD           ?= openocd
 OPENOCD_DIR       ?= 
 OPENOCD_INTERFACE ?= $(OPENOCD_DIR)interface/stlink-v2.cfg
 OPENOCD_TARGET    ?= target/nrf51_stlink.tcl
+OPENOCD_CMDS      ?=
 
 O                 ?= -Os
 
@@ -80,37 +84,37 @@ clean:
 	rm -f $(PROGRAM).bin $(PROGRAM).elf $(OBJS)
 	
 flash: $(PROGRAM).hex
-	$(OPENOCD) -d2 -f $(OPENOCD_INTERFACE) -f $(OPENOCD_TARGET) -c init -c targets -c "reset halt" \
+	$(OPENOCD) -d2 -f $(OPENOCD_INTERFACE) $(OPENOCD_CMDS) -f $(OPENOCD_TARGET) -c init -c targets -c "reset halt" \
                  -c "flash write_image erase $(PROGRAM).hex" -c "verify_image $(PROGRAM).hex" \
                  -c "mww 0x4001e504 0x01" -c "mww 0x10001080 0x3A000" -c "reset run" -c shutdown
 
 reset_bootloader:
-	$(OPENOCD) -d2 -f $(OPENOCD_INTERFACE) -f $(OPENOCD_TARGET) -c init -c targets -c "mww 0x4000051C 0x40" -c reset -c shutdown
+	$(OPENOCD) -d2 -f $(OPENOCD_INTERFACE) $(OPENOCD_CMDS) -f $(OPENOCD_TARGET) -c init -c targets -c "mww 0x4000051C 0x40" -c reset -c shutdown
 
 flash_to_bootloader:
 	make flash
 	make reset_bootloader
 
 flash_sd110: sd110/s110_nrf51822_6.0.0_softdevice.hex
-	$(OPENOCD) -d2 -f $(OPENOCD_INTERFACE) -f $(OPENOCD_TARGET) -c init -c targets -c "reset halt" \
+	$(OPENOCD) -d2 -f $(OPENOCD_INTERFACE) $(OPENOCD_CMDS) -f $(OPENOCD_TARGET) -c init -c targets -c "reset halt" \
                  -c "nrf51 mass_erase" \
                  -c "flash write_image erase sd110/s110_nrf51822_7.0.0-3.alpha_softdevice.hex" \
                  -c "reset run" -c shutdown
 
 reset_openocd:
-	$(OPENOCD) -d2 -f $(OPENOCD_INTERFACE) -f $(OPENOCD_TARGET) -c init -c targets -c reset -c shutdown
+	$(OPENOCD) -d2 -f $(OPENOCD_INTERFACE) $(OPENOCD_CMDS) -f $(OPENOCD_TARGET) -c init -c targets -c reset -c shutdown
 
 gdb_openocd: $(PROGRAM).elf
-	$(OPENOCD) -d2 -f $(OPENOCD_INTERFACE) -f $(OPENOCD_TARGET) -c init -c targets
+	$(OPENOCD) -d2 -f $(OPENOCD_INTERFACE) $(OPENOCD_CMDS) -f $(OPENOCD_TARGET) -c init -c targets
 
 reset:
-	$(OPENOCD) -d2 -f $(OPENOCD_INTERFACE) -f $(OPENOCD_TARGET) -c init -c targets -c "mww 0x40000544 0x01" -c reset -c shutdown
+	$(OPENOCD) -d2 -f $(OPENOCD_INTERFACE) $(OPENOCD_CMDS) -f $(OPENOCD_TARGET) -c init -c targets -c "mww 0x40000544 0x01" -c reset -c shutdown
 
 openocd: $(PROGRAM).elf
-	$(OPENOCD) -d2 -f $(OPENOCD_INTERFACE) -f $(OPENOCD_TARGET) -c init -c targets
+	$(OPENOCD) -d2 -f $(OPENOCD_INTERFACE) $(OPENOCD_CMDS) -f $(OPENOCD_TARGET) -c init -c targets
 
 gdb: $(PROGRAM).elf
 	$(GDB) -ex "target remote localhost:3333" -ex "monitor reset halt" -ex "set ((NRF_POWER_Type*)0x40000000)->GPREGRET = 0x40" $^
 
 semihosting: $(PROGRAM).elf
-	$(OPENOCD) -d2 -f $(OPENOCD_INTERFACE) -f $(OPENOCD_TARGET) -c init -c targets -c reset -c "arm semihosting enable" -c reset
+	$(OPENOCD) -d2 -f $(OPENOCD_INTERFACE) $(OPENOCD_CMDS) -f $(OPENOCD_TARGET) -c init -c targets -c reset -c "arm semihosting enable" -c reset
