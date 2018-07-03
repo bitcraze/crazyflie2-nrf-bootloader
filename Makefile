@@ -19,7 +19,9 @@ OPENOCD_CMDS      ?=
 
 O                 ?= -Os
 
+
 USES_RFX2411N     ?= 0
+USES_TI_CHARGER   ?= 1
 
 NRF51_SDK ?= nrf51_sdk/nrf51822
 NRF_S110 ?= s110
@@ -72,6 +74,10 @@ CFLAGS += -I$(NRF51_SDK)/Include/sd_common/
 
 ifeq ($(USES_RFX2411N), 1)
 CFLAGS += -DHAS_RFX2411N
+endif
+
+ifeq ($(USES_TI_CHARGER), 1)
+CFLAGS += -DHAS_TI_CHARGER
 endif
 
 OBJS += src/main.o gcc_startup_nrf51.o system_nrf51.o src/button.o
