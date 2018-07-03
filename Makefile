@@ -19,6 +19,8 @@ OPENOCD_CMDS      ?=
 
 O                 ?= -Os
 
+USES_RFX2411N     ?= 0
+
 NRF51_SDK ?= nrf51_sdk/nrf51822
 NRF_S110 ?= s110
 
@@ -26,7 +28,12 @@ INCLUDES= -I include/nrf -I $(NRF_S110)/s110_nrf51822_7.0.0_API/include -I inclu
 
 PROCESSOR = -mcpu=cortex-m0 -mthumb
 NRF= -DNRF51
+
+ifeq ($(USES_RFX2411N), 1)
+PROGRAM=cload_nrf_rfx2411n
+else
 PROGRAM=cload_nrf
+endif
 
 CFLAGS=$(PROCESSOR) $(NRF) $(INCLUDES) -g3 $(O) -Wall # -ffunction-sections -fdata-sections
 # --specs=nano.specs -flto
@@ -63,6 +70,9 @@ CFLAGS += -I$(NRF_S110)/include
 CFLAGS += -I$(NRF51_SDK)/Include/app_common/ 
 CFLAGS += -I$(NRF51_SDK)/Include/sd_common/ 
 
+ifeq ($(USES_RFX2411N), 1)
+CFLAGS += -DHAS_RFX2411N
+endif
 
 OBJS += src/main.o gcc_startup_nrf51.o system_nrf51.o src/button.o
 OBJS += src/systick.o src/ble.o src/ble_crazyflies.o src/esb.o src/timeslot.o

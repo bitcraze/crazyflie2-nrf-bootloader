@@ -103,9 +103,21 @@ int main()
 
   NRF_POWER->GPREGRET &= ~(0x60U);
 
+#ifdef HAS_RFX2411N
+  // Enable RF power amplifier
+  nrf_gpio_cfg_output(RADIO_PA_RX_EN);
+  nrf_gpio_cfg_output(RADIO_PA_MODE);
+  nrf_gpio_cfg_output(RADIO_PA_ANT_SW);
+  // Select antenna port A
+  nrf_gpio_pin_set(RADIO_PA_ANT_SW);
+
+  nrf_gpio_pin_set(RADIO_PA_RX_EN);
+  nrf_gpio_pin_clear(RADIO_PA_MODE);
+#else
   // Enable the radio LNA
   nrf_gpio_cfg_output(RADIO_PAEN_PIN);
   nrf_gpio_pin_set(RADIO_PAEN_PIN);
+#endif
 
   // Initialize timer module.
   APP_TIMER_INIT(APP_TIMER_PRESCALER, APP_TIMER_MAX_TIMERS, APP_TIMER_OP_QUEUE_SIZE, false);
@@ -152,6 +164,7 @@ int main()
   NRF_TIMER1->TASKS_START = 1;
 
 
+#ifdef HAS_TI_CHARGER
   // Enable 500mA USB input and enable battery charging
   nrf_gpio_cfg_output(PM_EN1);
   nrf_gpio_pin_set(PM_EN1);
@@ -159,7 +172,7 @@ int main()
   nrf_gpio_pin_clear(PM_EN2);
   nrf_gpio_cfg_output(PM_CHG_EN);
   nrf_gpio_pin_clear(PM_CHG_EN);
-
+#endif
 
   // Power STM32, hold reset
   nrf_gpio_cfg_output(PM_VCCEN_PIN);
