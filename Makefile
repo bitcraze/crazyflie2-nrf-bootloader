@@ -26,7 +26,7 @@ USES_TI_CHARGER   ?= 1
 NRF51_SDK ?= nrf51_sdk/nrf51822
 NRF_S110 ?= s110
 
-INCLUDES= -I include/nrf -I $(NRF_S110)/s110_nrf51822_7.0.0_API/include -I include/cm0 -I include/
+INCLUDES= -I include/nrf -I $(NRF_S110)/s110_nrf51822_7.3.0_API/include -I include/cm0 -I include/
 
 PROCESSOR = -mcpu=cortex-m0 -mthumb
 NRF= -DNRF51
@@ -114,7 +114,7 @@ flash_to_bootloader:
 flash_sd110: sd110/s110_nrf51822_6.0.0_softdevice.hex
 	$(OPENOCD) -d2 -f $(OPENOCD_INTERFACE) $(OPENOCD_CMDS) -f $(OPENOCD_TARGET) -c init -c targets -c "reset halt" \
                  -c "nrf51 mass_erase" \
-                 -c "flash write_image erase sd110/s110_nrf51822_7.0.0-3.alpha_softdevice.hex" \
+                 -c "flash write_image erase sd110/s110_nrf51822_7.3.0-3.alpha_softdevice.hex" \
                  -c "reset run" -c shutdown
 
 reset_openocd:
