@@ -7,7 +7,7 @@ architecture.
 
 Compiling requires the nRF51_SDK and S110 packages.
 
-        ./tools/build/download_deps.sh
+        ./tools/build/download_deps
 
 will download the zips and unpack them.
 If you want to download manually from the Nordic semiconductor website, you
