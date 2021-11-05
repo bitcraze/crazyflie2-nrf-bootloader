@@ -149,8 +149,8 @@ int main() {
 
   //NRF_TIMER1->TASKS_CLEAR = 1;
 
-  NRF_TIMER1->CC[0] = 1*SEC; //0x1E84 ;
-  NRF_TIMER1->CC[1] = 2*SEC;
+  NRF_TIMER1->CC[0] = 1 * SEC; //0x1E84 ;
+  NRF_TIMER1->CC[1] = 2 * SEC;
 
 
   nrf_gpio_cfg_output(LED_PIN);
