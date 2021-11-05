@@ -30,6 +30,7 @@
 #include "crtp.h"
 #include "bootloader.h"
 #include "crc.h"
+#include "systick.h"
 
 #include <nrf.h>
 #include <ble.h>
@@ -49,8 +50,7 @@ static int flashError;
 static WriteFlashParameters_t flashParams = {0};
 
 
-static int verifyCopyFlashFlags()
-{
+static int verifyCopyFlashFlags() {
   CopyFlashFlags_t *flashFlags = (void*)FLASH_BASE+((FLASH_PAGES-1)*PAGE_SIZE);
   int error = 0;
   uint32_t crc = crcSlow(flashFlags, sizeof(CopyFlashFlags_t)-4);
@@ -100,18 +100,15 @@ static int verifyCopyFlashFlags()
 
 // Pass a packet.
 // Return true and replaces the packet content if has data to communicate back
-bool bootloaderProcess(CrtpPacket *packet)
-{
+bool bootloaderProcess(CrtpPacket *packet) {
   bool tx = false;
 
-  if ( (packet->datalen != 0xFFU) &&
+  if ((packet->datalen != 0xFFU) &&
          (packet->datalen >= 2) &&
          (packet->header == 0xFF) &&
          (packet->data[0] == 0xFE)) {
-         //(!strcmp(packet->raw, "\xff\xfe")) ) {
 
-    if (packet->data[1] == CMD_GET_INFO)
-    {
+    if (packet->data[1] == CMD_GET_INFO) {
       GetInfoReturns_t * info = (GetInfoReturns_t *)&packet->data[2];
 
       info->pageSize = PAGE_SIZE;
@@ -133,55 +130,46 @@ bool bootloaderProcess(CrtpPacket *packet)
 
       esbSetAddress(addressPk->address);
     }*/
-    else if (packet->data[1] == CMD_LOAD_BUFFER)
-    {
-      int i=0;
+    else if (packet->data[1] == CMD_LOAD_BUFFER) {
+      int i = 0;
       LoadBufferParameters_t *params = (LoadBufferParameters_t *)&packet->data[2];
-      char *data = (char*) &packet->data[2+sizeof(LoadBufferParameters_t)];
+      char *data = (char*)&packet->data[2 + sizeof(LoadBufferParameters_t)];
 
       //Fill the buffer with the given datas
-      for(i=0; i<(packet->datalen-(2+sizeof(LoadBufferParameters_t))) && (i+(params->page*PAGE_SIZE)+params->address)<(BUFFER_PAGES*PAGE_SIZE); i++)
-      {
+      for (i = 0; i < (packet->datalen - (2 + sizeof(LoadBufferParameters_t)))
+        && (i + (params->page * PAGE_SIZE) + params->address) < (BUFFER_PAGES * PAGE_SIZE); i++)
         buffer[(i+(params->page*PAGE_SIZE)+params->address)] = data[i];
-      }
+
     }
-    else if (packet->data[1] == CMD_READ_BUFFER)
-    {
-      int i=0;
+    else if (packet->data[1] == CMD_READ_BUFFER) {
+      int i = 0;
       ReadBufferParameters_t *params = (ReadBufferParameters_t *)&packet->data[2];
-      char *data = (char*) &packet->data[2+sizeof(ReadBufferParameters_t)];
+      char *data = (char*)&packet->data[2 + sizeof(ReadBufferParameters_t)];
 
       //Return the datas required
-      for(i=0; i<25 && (i+(params->page*PAGE_SIZE)+params->address)<(BUFFER_PAGES*PAGE_SIZE); i++)
-      {
-        data[i] = buffer[(i+(params->page*PAGE_SIZE)+params->address)];
-      }
+      for (i = 0; i < 25 && (i + (params->page * PAGE_SIZE) + params->address) < (BUFFER_PAGES*PAGE_SIZE); i++)
+        data[i] = buffer[(i + (params->page * PAGE_SIZE) + params->address)];
 
       packet->datalen += i;
 
-      tx=true;
-    }
-    else if (packet->data[1] == CMD_READ_FLASH)
-    {
-      int i=0;
+      tx = true;
+    } else if (packet->data[1] == CMD_READ_FLASH) {
+      int i = 0;
       ReadFlashParameters_t *params = (ReadFlashParameters_t *)&packet->data[2];
-      char *data = (char*) &packet->data[2+sizeof(ReadFlashParameters_t)];
-      char *flash= (char*)FLASH_BASE;
+      char *data = (char*)&packet->data[2 + sizeof(ReadFlashParameters_t)];
+      char *flash = (char*)FLASH_BASE;
 
       //Return the datas required
-      for(i=0; i<25 && (i+(params->page*PAGE_SIZE)+params->address)<(FLASH_PAGES*PAGE_SIZE); i++)
-      {
+      for (i = 0; i < 25 && (i + (params->page * PAGE_SIZE) + params->address) < (FLASH_PAGES * PAGE_SIZE); i++) {
         //data[i] = flash[(i+(params->page*PAGE_SIZE)+params->address)];
         //data[i] = *((char*)(FLASH_BASE+i+(params->page*PAGE_SIZE)+params->address));
-        data[i] = flash[(i+(params->page*PAGE_SIZE)+params->address)];
+        data[i] = flash[(i + (params->page * PAGE_SIZE) + params->address)];
       }
 
       packet->datalen += i;
 
-      tx=true;
-    }
-    else if (packet->data[1] == CMD_WRITE_FLASH)
-    {
+      tx = true;
+    } else if (packet->data[1] == CMD_WRITE_FLASH) {
       //int i;
       unsigned int error = 0xFF;
       //int flashAddress;
@@ -193,10 +181,9 @@ bool bootloaderProcess(CrtpPacket *packet)
         goto finally;
 
       //Test if it is an acceptable write request
-      if ( (params->flashPage<FLASH_START) || (params->flashPage>=FLASH_PAGES) ||
-           ((params->flashPage+params->nPages)>FLASH_PAGES) || (params->bufferPage>=BUFFER_PAGES)
-         )
-      {
+      if ((params->flashPage<FLASH_START) || (params->flashPage >= FLASH_PAGES) ||
+           ((params->flashPage + params->nPages) > FLASH_PAGES) || (params->bufferPage >= BUFFER_PAGES)
+         ) {
         //Return a failure answer
         returns->done = 0;
         returns->error = 1;
@@ -204,8 +191,7 @@ bool bootloaderProcess(CrtpPacket *packet)
         tx = 1;
       }
       // Else, if everything is OK, flash the page(s)
-      else
-      {
+      else {
 
         flashParams = *params;
         currentFlashPage = flashParams.flashPage;
@@ -243,8 +229,8 @@ bool bootloaderProcess(CrtpPacket *packet)
       tx = true;
     } else if (packet->data[1] == CMD_RESET) {
       int start = systickGetTick();
-      while ((systickGetTick()-start)<100);
-      if ((packet->datalen>=3) && (packet->data[2] == 0)) {
+      while ((systickGetTick()-start) < 100);
+      if ((packet->datalen >= 3) && (packet->data[2] == 0)) {
         //Set bit 0x40 forces boot to bootloader
         NRF_POWER->GPREGRET |= 0x40U;
       } else {
@@ -256,8 +242,8 @@ bool bootloaderProcess(CrtpPacket *packet)
       CopyFlashReturns_t *returns = (void*)&packet->data[2];
 
       returns->error = verifyCopyFlashFlags();
-      returns->willdo = (returns->error)?0:1;
-      packet->datalen = 2+sizeof(CopyFlashReturns_t);
+      returns->willdo = (returns->error) ? 0 : 1;
+      packet->datalen = 2 + sizeof(CopyFlashReturns_t);
       tx = true;
     }
   }
@@ -265,7 +251,7 @@ bool bootloaderProcess(CrtpPacket *packet)
   /* Flashing asynchronous work, make sure to run them when they can return
    * data to send back
    */
-  if ((tx==false) && (packet->datalen != 0xFFU)) {
+  if ((tx == false) && (packet->datalen != 0xFFU)) {
     WriteFlashReturns_t *returns = (WriteFlashReturns_t *)&packet->data[2];
     switch (bootloaderState) {
       case bootloaderFlashOk:
@@ -281,7 +267,7 @@ bool bootloaderProcess(CrtpPacket *packet)
         packet->data[1] = CMD_WRITE_FLASH;
         returns->done = 0;
         returns->error = flashError;
-        packet->datalen = 2+sizeof(WriteFlashReturns_t);
+        packet->datalen = 2 + sizeof(WriteFlashReturns_t);
         tx = true;
 
         bootloaderState = bootloaderIdle;
@@ -294,75 +280,74 @@ bool bootloaderProcess(CrtpPacket *packet)
   return tx;
 }
 
-void bootloaderOnSdEvt(uint32_t evt)
-{
+void bootloaderOnSdEvt(uint32_t evt) {
   int err;
 
   if (evt == NRF_EVT_FLASH_OPERATION_SUCCESS) {
-        switch (bootloaderState) {
-          case bootloaderErasing:
-            currentFlashPage += 1;
-            if (currentFlashPage < (flashParams.flashPage+flashParams.nPages)) {
-              // Erase next page
-              if (sd_flash_page_erase(currentFlashPage) != NRF_SUCCESS) {
-                flashError = 2;
-                bootloaderState = bootloaderFlashFail;
-              }
-            } else {
-              // Start flashing
-              currentFlashPage = flashParams.flashPage;
-              currentBufferPage = flashParams.bufferPage;
-              bootloaderState = bootloaderFlashing;
+    switch (bootloaderState) {
+      case bootloaderErasing:
+        currentFlashPage += 1;
+        if (currentFlashPage < (flashParams.flashPage + flashParams.nPages)) {
+          // Erase next page
+          if (sd_flash_page_erase(currentFlashPage) != NRF_SUCCESS) {
+            flashError = 2;
+            bootloaderState = bootloaderFlashFail;
+          }
+        } else {
+          // Start flashing
+          currentFlashPage = flashParams.flashPage;
+          currentBufferPage = flashParams.bufferPage;
+          bootloaderState = bootloaderFlashing;
 
-              err = sd_flash_write((uint32_t *) (FLASH_BASE+(currentFlashPage*PAGE_SIZE)),
-                                   (uint32_t const *) ((uint32_t)buffer)+(currentBufferPage*PAGE_SIZE),
-                                   256);
-              if (err != NRF_SUCCESS) {
-                flashError = 3;
-                bootloaderState = bootloaderFlashFail;
-              }
-            }
-            break;
-          case bootloaderFlashing:
-            currentFlashPage += 1;
-            currentBufferPage += 1;
-
-            if (currentFlashPage < (flashParams.flashPage+flashParams.nPages)) {
-              err = sd_flash_write((uint32_t *) (FLASH_BASE+(currentFlashPage*PAGE_SIZE)),
-                                   (uint32_t const *) ((uint32_t)buffer)+(currentBufferPage*PAGE_SIZE),
-                                   256);
-              if (err != NRF_SUCCESS) {
-                flashError = 3;
-                bootloaderState = bootloaderFlashFail;
-              }
-            } else {
-              bootloaderState = bootloaderFlashOk;
-            }
-            break;
-          default:
-            break;
+          err = sd_flash_write((uint32_t *)(FLASH_BASE + (currentFlashPage * PAGE_SIZE)),
+                               (uint32_t const *)((uint32_t)buffer) + (currentBufferPage * PAGE_SIZE),
+                               256);
+          if (err != NRF_SUCCESS) {
+            flashError = 3;
+            bootloaderState = bootloaderFlashFail;
+          }
         }
+        break;
+      case bootloaderFlashing:
+        currentFlashPage += 1;
+        currentBufferPage += 1;
+
+        if (currentFlashPage < (flashParams.flashPage + flashParams.nPages)) {
+          err = sd_flash_write((uint32_t *)(FLASH_BASE + (currentFlashPage * PAGE_SIZE)),
+                               (uint32_t const *)((uint32_t)buffer) + (currentBufferPage * PAGE_SIZE),
+                               256);
+          if (err != NRF_SUCCESS) {
+            flashError = 3;
+            bootloaderState = bootloaderFlashFail;
+          }
+        } else {
+          bootloaderState = bootloaderFlashOk;
+        }
+        break;
+      default:
+        break;
+    }
   } else if (evt == NRF_EVT_FLASH_OPERATION_ERROR) {
-        switch (bootloaderState) {
-          case bootloaderErasing:
-            // Start the flashing process. The rest is handled by the event handler state machine
-            if (sd_flash_page_erase(currentFlashPage) != NRF_SUCCESS) {
-              flashError = 2;
-              bootloaderState = bootloaderFlashFail;
-            }
-            break;
-          case bootloaderFlashing:
-            err = sd_flash_write((uint32_t *) (FLASH_BASE+(currentFlashPage*PAGE_SIZE)),
-                                 (uint32_t const *) ((uint32_t)buffer)+(currentBufferPage*PAGE_SIZE),
-                                 256);
-            if (err != NRF_SUCCESS) {
-              flashError = 3;
-              bootloaderState = bootloaderFlashFail;
-            }
-            break;
-          default:
-            break;
+    switch (bootloaderState) {
+      case bootloaderErasing:
+        // Start the flashing process. The rest is handled by the event handler state machine
+        if (sd_flash_page_erase(currentFlashPage) != NRF_SUCCESS) {
+          flashError = 2;
+          bootloaderState = bootloaderFlashFail;
         }
+        break;
+      case bootloaderFlashing:
+        err = sd_flash_write((uint32_t *)(FLASH_BASE + (currentFlashPage * PAGE_SIZE)),
+                             (uint32_t const *)((uint32_t)buffer) + (currentBufferPage * PAGE_SIZE),
+                             256);
+        if (err != NRF_SUCCESS) {
+          flashError = 3;
+          bootloaderState = bootloaderFlashFail;
+        }
+        break;
+      default:
+        break;
+    }
   }
 }
 

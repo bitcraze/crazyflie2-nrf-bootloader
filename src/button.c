@@ -30,34 +30,36 @@
 #include "button.h"
 #include "systick.h"
 
+#define BUTTON_READ() ((NRF_GPIO->IN >> BUTTON_PIN) & 1UL)
+#define BUTTON_PRESSED 0UL
+#define BUTTON_RELEASED 1UL
+#define BUTTON_DEBOUNCE_TICK 1
+#define BUTTON_LONGPRESS_TICK 300
+
 static ButtonEvent state;
 
-void buttonInit(ButtonEvent initialEvent)
-{
+void buttonInit(ButtonEvent initialEvent) {
   nrf_gpio_cfg_input(BUTTON_PIN, NRF_GPIO_PIN_PULLUP);
   NRF_GPIO->PIN_CNF[BUTTON_PIN] |= (GPIO_PIN_CNF_SENSE_Low << GPIO_PIN_CNF_SENSE_Pos);
 
   state = initialEvent;
 }
 
-void buttonProcess()
-{
+void buttonProcess() {
   static unsigned int lastTick;
   static unsigned int pressedTick;
   static bool pressed;
 
-  if (lastTick != systickGetTick())
-  {
+  if (lastTick != systickGetTick()) {
     lastTick = systickGetTick();
 
-    if (pressed==false && BUTTON_READ()==BUTTON_PRESSED)
-    {
+    if (pressed==false && BUTTON_READ() == BUTTON_PRESSED) {
       pressed = true;
       pressedTick = systickGetTick();
-    } else if (pressed==true && BUTTON_READ()==BUTTON_RELEASED) {
+    } else if (pressed==true && BUTTON_READ() == BUTTON_RELEASED) {
       pressed = false;
-      if (((systickGetTick()-pressedTick)<BUTTON_LONGPRESS_TICK) &&
-          ((systickGetTick()-pressedTick)>BUTTON_DEBOUNCE_TICK) ) {
+      if (((systickGetTick() - pressedTick) < BUTTON_LONGPRESS_TICK) &&
+          ((systickGetTick() - pressedTick) > BUTTON_DEBOUNCE_TICK) ) {
         state = buttonShortPress;
       } else {
         state = buttonLongPress;
@@ -66,10 +68,8 @@ void buttonProcess()
   }
 }
 
-ButtonEvent buttonGetState()
-{
+ButtonEvent buttonGetState() {
   ButtonEvent currentState = state;
-
   state = buttonIdle;
 
   return currentState;

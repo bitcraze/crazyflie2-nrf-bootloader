@@ -56,8 +56,8 @@
 #define APP_TIMER_OP_QUEUE_SIZE              5                                          /**< Size of timer operation queues. */
 
 // Time for timers
-#define MS 125UL
-#define SEC  1000UL*MS
+#define MS  125UL
+#define SEC (1000UL * MS)
 
 static sd_mbr_command_t startSdCmd = {
   .command = SD_MBR_COMMAND_INIT_SD,
@@ -68,34 +68,32 @@ void ble_init(void);
 void mainLoop(void);
 
 void start_firmware() __attribute__ ((noreturn, naked));
-void start_firmware()
-{
-  void (*fw_start)(void) = *(void (**)(void))(FW_ADDRESS+4);
+void start_firmware() {
+  void (*fw_start)(void) = *(void (**)(void))(FW_ADDRESS + 4);
 
   sd_softdevice_vector_table_base_set(FW_ADDRESS);
   __set_MSP(*(uint32_t*)FW_ADDRESS);
   fw_start();
 
-  while(1);
+  while (1);
 }
 
 
-int main() __attribute__ ((noreturn));
-int main()
-{
+// int main() __attribute__ ((noreturn));
+int main() {
   static char address[5];
 
   sd_mbr_command(&startSdCmd);
   sd_softdevice_vector_table_base_set(BOOTLOADER_ADDRESS);
 
   // If the master boot switch has detected short or no click: boot the firmware
-  if (((NRF_POWER->GPREGRET&0x86U) != 0x82U) &&
-      ((NRF_POWER->GPREGRET&0x40U) != 0x40U) &&
+  if (((NRF_POWER->GPREGRET & 0x86U) != 0x82U) &&
+      ((NRF_POWER->GPREGRET & 0x40U) != 0x40U) &&
       (*(uint32_t *)FW_ADDRESS != 0xFFFFFFFFU) ) {
     start_firmware();
   }
 
-  if (NRF_POWER->GPREGRET&0x40U) {
+  if (NRF_POWER->GPREGRET & 0x40U) {
     address[4] = 0xb1;
     memcpy(&address[0], (char*)&NRF_FICR->DEVICEADDR[0], 4);
     esbSetAddress(address);
@@ -198,7 +196,8 @@ int main()
 
   mainLoop();
 
-  while(1);
+  while (1);
+  return 0;
 }
 
 static enum {connect_idle, connect_ble, connect_sb} cstate = connect_idle;
@@ -222,13 +221,12 @@ typedef struct CRTPPacket_s {
 } CRTPPacket;
 */
 
-void mainLoop(void)
-{
+void mainLoop(void) {
   bool resetToFw = false;
   static CrtpPacket crtpPacket;
   static bool stmStarted = false;
 
-  while(!resetToFw) {
+  while (!resetToFw) {
     EsbPacket *packet;
     buttonProcess();
 

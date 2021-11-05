@@ -26,7 +26,7 @@ USES_TI_CHARGER   ?= 1
 NRF51_SDK ?= nrf51_sdk/nrf51822
 NRF_S110 ?= s110
 
-INCLUDES= -I include/nrf -I $(NRF_S110)/s110_nrf51822_7.3.0_API/include -I include/cm0 -I include/
+INCLUDES = -I include/nrf -I $(NRF_S110)/s110_nrf51822_7.3.0_API/include -I include/cm0 -I include/
 
 PROCESSOR = -mcpu=cortex-m0 -mthumb
 NRF= -DNRF51
@@ -37,7 +37,7 @@ else
 PROGRAM=cload_nrf
 endif
 
-CFLAGS=$(PROCESSOR) $(NRF) $(INCLUDES) -g3 $(O) -Wall # -ffunction-sections -fdata-sections
+CFLAGS=$(PROCESSOR) $(NRF) $(INCLUDES) -g3 $(O) -Wall -Werror# -ffunction-sections -fdata-sections
 # --specs=nano.specs -flto
 ASFLAGS=$(PROCESSOR)
 LDFLAGS=$(PROCESSOR) $(O) --specs=nano.specs -Wl,-Map=$(PROGRAM).map # -Wl,--gc-sections

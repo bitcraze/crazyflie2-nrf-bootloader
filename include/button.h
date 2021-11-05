@@ -27,17 +27,11 @@
 #include "pinout.h"
 #include <nrf.h>
 
-#define BUTTON_INIT() NRF_GPIO->PIN_CNF[BUTTON_PIN] = GPIO_PIN_CNF_DIR_Input | (GPIO_PIN_CNF_PULL_Pullup << GPIO_PIN_CNF_PULL_Pos) | (GPIO_PIN_CNF_SENSE_Low << GPIO_PIN_CNF_SENSE_Pos)
-
-#define BUTTON_READ() ((NRF_GPIO->IN >> BUTTON_PIN) & 1UL)
-
-#define BUTTON_PRESSED 0UL
-#define BUTTON_RELEASED 1UL
-
-#define BUTTON_DEBOUNCE_TICK 1
-#define BUTTON_LONGPRESS_TICK 300
-
-typedef enum {buttonIdle=0, buttonShortPress, buttonLongPress} ButtonEvent;
+typedef enum {
+  buttonIdle = 0,
+  buttonShortPress,
+  buttonLongPress
+} ButtonEvent;
 
 void buttonInit(ButtonEvent initialEvent);
 
