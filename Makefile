@@ -111,10 +111,10 @@ flash_to_bootloader:
 	make flash
 	make reset_bootloader
 
-flash_sd110: sd110/s110_nrf51822_6.0.0_softdevice.hex
+flash_sd110: s110/s110_nrf51822_7.3.0_softdevice.hex
 	$(OPENOCD) -d2 -f $(OPENOCD_INTERFACE) $(OPENOCD_CMDS) -f $(OPENOCD_TARGET) -c init -c targets -c "reset halt" \
                  -c "nrf51 mass_erase" \
-                 -c "flash write_image erase sd110/s110_nrf51822_7.3.0-3.alpha_softdevice.hex" \
+                 -c "flash write_image erase s110/s110_nrf51822_7.3.0_softdevice.hex" \
                  -c "reset run" -c shutdown
 
 reset_openocd:
