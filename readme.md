@@ -29,3 +29,8 @@ Compiling
 
 To compile arm-none-eabi- tools from https://launchpad.net/gcc-arm-embedded
 should be in the path.
+
+Architecture
+--------
+
+Check out the readme of the [crazyflie-stm-bootloader repository](https://github.com/bitcraze/crazyflie2-stm-bootloader) to understand the interplay between the stm and nrf bootloaders.
