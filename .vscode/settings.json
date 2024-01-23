@@ -5,7 +5,8 @@
         "type_traits": "cpp",
         "softdevice_handler.h": "c",
         "app_button.h": "c",
-        "crazyflie2_pm.h": "c"
+        "crazyflie2_pm.h": "c",
+        "boards.h": "c"
     },
     "cortex-debug.variableUseNaturalFormat": false
 }
