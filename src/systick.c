@@ -20,41 +20,43 @@
  *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library.
+ *
+ * 1ms systick timer
  */
-#ifndef __PACKET_H__
-#define __PACKET_H__
+#include <nrf.h>
 
-#include <stdbool.h>
-#include <stdint.h>
+static unsigned int tick = 0;
 
-#define SYSLINK_MTU 32
+//void RTC1_IRQHandler()
+void TIMER2_IRQHandler()
+{
+  tick++;
+  //NRF_RTC1->EVENTS_TICK = 0;
+  NRF_TIMER2->EVENTS_COMPARE[0] = 0;
+}
 
-struct syslinkPacket {
-  uint8_t type;
-  uint8_t length;
-  char data[SYSLINK_MTU];
-};
+void systickInit()
+{
+//  NRF_RTC1->PRESCALER = 327; //100Hz systick
+//  NRF_RTC1->EVTENSET = RTC_EVTENSET_TICK_Msk;
+//  NRF_RTC1->INTENSET = RTC_INTENSET_TICK_Msk;
+//  NVIC_EnableIRQ(RTC1_IRQn);
 
-bool syslinkReceive(struct syslinkPacket *packet);
+//  NRF_RTC1->TASKS_START = 1UL;
 
-bool syslinkSend(struct syslinkPacket *packet);
+  NRF_TIMER2->TASKS_CLEAR = 1;
 
+  NRF_TIMER2->PRESCALER = 4;
+  NRF_TIMER2->CC[0] = 1000;
+  NRF_TIMER2->SHORTS = 1UL<<TIMER_SHORTS_COMPARE0_CLEAR_Pos;
+  NRF_TIMER2->INTENSET = (1UL << TIMER_INTENSET_COMPARE0_Pos);
+  NVIC_EnableIRQ(TIMER2_IRQn);
 
-// Defined packet types
-#define SYSLINK_RADIO_RAW      0x00
-#define SYSLINK_RADIO_CHANNEL  0x01
-#define SYSLINK_RADIO_DATARATE 0x02
+  NRF_TIMER2->TASKS_START = 1;
+}
 
+unsigned int systickGetTick()
+{
+  return tick;
+}
 
-#define SYSLINK_PM_SOURCE 0x10
-
-#define SYSLINK_PM_ONOFF_SWITCHOFF 0x11
-
-#define SYSLINK_PM_BATTERY_VOLTAGE 0x12
-#define SYSLINK_PM_BATTERY_STATE   0x13
-#define SYSLINK_PM_BATTERY_AUTOUPDATE 0x14
-
-#define SYSLINK_OW_SCAN 0x20
-#define SYSLINK_OW_READ 0x21
-
-#endif

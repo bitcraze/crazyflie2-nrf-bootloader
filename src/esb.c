@@ -5,8 +5,8 @@
  * +------+    / /_/ / / /_/ /__/ /  / /_/ / / /_/  __/
  *  ||  ||    /_____/_/\__/\___/_/   \__,_/ /___/\___/
  *
- * Crazyflie 2.0 NRF Firmware
- * Copyright (c) 2014, Bitcraze AB, All rights reserved.
+ * Crazyflie 2.0 nRF51 Bootloader
+ * Copyright (c) 2014, Bitcraze AB
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -21,131 +21,93 @@
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library.
  *
- * esb.c - Implementation of the Nordic ESB protocol in PRX mode for nRF51822
+ * Implementation of the Nordic ESB protocol in PRX mode for nRF51822
  */
 #include <stdlib.h>
-#include <stdbool.h>
 #include <string.h>
+#include <stdint.h>
+#include <stdbool.h>
 
 #include "esb.h"
-#include "crazyflie2_pm.h"
 
-#include "nrf.h"
-#include "softdevice_handler.h"
+#include <nrf.h>
 
-#define RXQ_LEN 2
-#define TXQ_LEN 2
+#undef RSSI_ACK_PACKET
 
-static bool isInit = true;
+#define RXQ_LEN 4
+#define TXQ_LEN 4
 
-static int channel = 80;
-static int datarate = esbDatarate2M;
-static int txpower = RADIO_TXPOWER_TXPOWER_0dBm;
-static bool contwave = false;
-static uint64_t address = 0xE7E7E7E7E7ULL;
+static char address[5] = {0xe7, 0xe7, 0xe7, 0xe7, 0xe7};
 
-static volatile enum {doTx, doRx} rs;      //Radio state
+static enum {doTx, doRx} rs;      //Radio state
 
-static EsbPacket rxPackets[RXQ_LEN];
-static volatile int rxq_head = 0;
-static volatile int rxq_tail = 0;
+static EsbPacket rxPackets[TXQ_LEN];
+static int rxq_head = 0;
+static int rxq_tail = 0;
 
 static EsbPacket txPackets[TXQ_LEN];
-static volatile int txq_head = 0;
-static volatile int txq_tail = 0;
+static int txq_head = 0;
+static int txq_tail = 0;
 
-// 1bit packet counters
-static volatile int curr_down = 1;
-static volatile int curr_up = 1;
+static EsbPacket ackPacket;
 
-static volatile bool has_safelink;
-
-static EsbPacket ackPacket;     // Empty ack packet
-static EsbPacket servicePacket; // Packet sent to answer a low level request
-static EsbPacket p2pPacket;     // Packet to send to other crazyflie in broadcast
-/* helper functions */
-
-static uint32_t swap_bits(uint32_t inp)
+// Function that swaps the bits within each byte in a uint32. Used to convert from nRF24L type addressing to nRF51 type addressing
+static uint32_t bytewise_bit_swap(uint32_t inp)
 {
-  uint32_t i;
-  uint32_t retval = 0;
-
-  inp = (inp & 0x000000FFUL);
-
-  for(i = 0; i < 8; i++)
-  {
-    retval |= ((inp >> i) & 0x01) << (7 - i);
-  }
-
-  return retval;
-}
-
-static uint32_t bytewise_bitswap(uint32_t inp)
-{
-  return (swap_bits(inp >> 24) << 24)
-       | (swap_bits(inp >> 16) << 16)
-       | (swap_bits(inp >> 8) << 8)
-       | (swap_bits(inp));
+    inp = (inp & 0xF0F0F0F0) >> 4 | (inp & 0x0F0F0F0F) << 4;
+    inp = (inp & 0xCCCCCCCC) >> 2 | (inp & 0x33333333) << 2;
+    return (inp & 0xAAAAAAAA) >> 1 | (inp & 0x55555555) << 1;
 }
 
 /* Radio protocol implementation */
 
-// Handles the queue
-static void setupTx(bool retry, bool empty)
+static bool isRetry(EsbPacket *pk)
 {
-  static volatile EsbPacket * lastSentPacket;
+  static int prevPid;
+  static int prevCrc;
 
-  if (!empty && retry) {
+  bool retry = false;
+
+  if ((prevPid == pk->pid) && (prevCrc == pk->crc)) {
+    retry = true;
+  }
+
+  prevPid = pk->pid;
+  prevCrc = pk->crc;
+
+  return retry;
+}
+
+// Handles the queue
+static void setupTx(bool retry) {
+  static EsbPacket * lastSentPacket;
+
+  if (retry) {
     NRF_RADIO->PACKETPTR = (uint32_t)lastSentPacket;
-  } else if (!empty) { // Non-empty retry
+  } else {
     if (lastSentPacket != &ackPacket) {
       //No retry, TX payload has been sent!
       if (txq_head != txq_tail) {
         txq_tail = ((txq_tail+1)%TXQ_LEN);
       }
     }
-    if (lastSentPacket == &servicePacket) {
-      servicePacket.size = 0;
-    }
 
-    if (servicePacket.size) {
-      NRF_RADIO->PACKETPTR = (uint32_t)&servicePacket;
-      lastSentPacket = &servicePacket;
-    } else if (txq_tail != txq_head) {
+    if (txq_tail != txq_head) {
       // Send next TX packet
       NRF_RADIO->PACKETPTR = (uint32_t)&txPackets[txq_tail];
-      if (has_safelink) {
-        txPackets[txq_tail].data[0] = (txPackets[txq_tail].data[0]&0xf3) | curr_down<<2;
-      }
       lastSentPacket = &txPackets[txq_tail];
     } else {
       // Send empty ACK
 #ifdef RSSI_ACK_PACKET
       ackPacket.size = 3;
-      ackPacket.data[0] = 0xf3 | curr_down<<2;
+      ackPacket.data[0] = 0xff;
       ackPacket.data[1] = 0x01;
       ackPacket.data[2] = NRF_RADIO->RSSISAMPLE;
-#elif defined RSSI_VBAT_ACK_PACKET
-      ackPacket.size = 4 + sizeof(uint32_t);
-      ackPacket.data[0] = 0xf3 | curr_down<<2;
-      ackPacket.data[1] = 0x01;
-      ackPacket.data[2] = NRF_RADIO->RSSISAMPLE;
-      ackPacket.data[3] = 0x02;
-      uint32_t vBat = (uint32_t)(pmGetVBAT() * 1000); // Send voltage in mV
-      memcpy(&ackPacket.data[4], &vBat, sizeof(uint32_t));
-#else
-      ackPacket.size = 1;
-      ackPacket.data[0] = 0xf3 | curr_down<<2;
 #endif
       NRF_RADIO->PACKETPTR = (uint32_t)&ackPacket;
       lastSentPacket = &ackPacket;
     }
-  } else { // Send back empty ack (for P2P)
-    ackPacket.size = 0;
-    NRF_RADIO->PACKETPTR = (uint32_t)&ackPacket;
   }
-
-  NRF_RADIO->TXADDRESS = 0x00UL;
 
   //After being disabled the radio will automatically send the ACK
   NRF_RADIO->SHORTS &= ~RADIO_SHORTS_DISABLED_RXEN_Msk;
@@ -154,19 +116,13 @@ static void setupTx(bool retry, bool empty)
   NRF_RADIO->TASKS_DISABLE = 1UL;
 }
 
-static void setupRx()
-{
+static void setupRx() {
   NRF_RADIO->PACKETPTR = (uint32_t)&rxPackets[rxq_head];
 
   NRF_RADIO->SHORTS &= ~RADIO_SHORTS_DISABLED_TXEN_Msk;
   NRF_RADIO->SHORTS |= RADIO_SHORTS_DISABLED_RXEN_Msk;
   rs = doRx;
   NRF_RADIO->TASKS_DISABLE = 1UL;
-}
-
-void RADIO_IRQHandler()
-{
-  esbInterruptHandler();
 }
 
 void esbInterruptHandler()
@@ -185,9 +141,8 @@ void esbInterruptHandler()
       }
 
       pk = &rxPackets[rxq_head];
-      pk->rssi = (uint8_t) NRF_RADIO->RSSISAMPLE;
+      pk->rssi = NRF_RADIO->RSSISAMPLE;
       pk->crc = NRF_RADIO->RXCRC;
-      pk->match = NRF_RADIO->RXMATCH;
 
       // If no more space available on RX queue, drop packet!
       if (((rxq_head+1)%RXQ_LEN) == rxq_tail) {
@@ -195,65 +150,15 @@ void esbInterruptHandler()
         return;
       }
 
-      // Ack P2P packets right away with empty ack
-      if (pk->match == ESB_UNICAST_ADDRESS_MATCH &&
-          pk->size >= 2 && (pk->data[0] & 0xf3) == 0xf3 && (pk->data[1]&0xf0) == 0x80) {
-        setupTx(false, true);
-
-        // Push the queue head to push this packet and prepare the next
-        // The main loop will recognize it as a P2P packet
-        rxq_head = ((rxq_head+1)%RXQ_LEN);
+      // If this packet is a retry, send the same ACK again
+      if (isRetry(pk)) {
+        setupTx(true);
         return;
       }
 
-      // Ack Bootloader packets right away with regular ack
-      if (pk->match == ESB_UNICAST_ADDRESS_MATCH &&
-          pk->size >= 2 && (pk->data[0] & 0xf3) == 0xf3 && pk->data[1] == 0xfe) {
-        setupTx(false, false);
-
-        // Push the queue head to push this packet and prepare the next
-        // The main loop will recognize it as a bootloader packet
-        rxq_head = ((rxq_head+1)%RXQ_LEN);
-        return;
-      }
-
-      if ((pk->match == ESB_UNICAST_ADDRESS_MATCH))
-      {
-        // Match safeLink packet and answer it
-        if (pk->size == 3 && (pk->data[0]&0xf3) == 0xf3 && pk->data[1] == 0x05) {
-          has_safelink = pk->data[2];
-          memcpy(servicePacket.data, pk->data, 3);
-          servicePacket.size = 3;
-          setupTx(false, false);
-
-          // Reset packet counters
-          curr_down = 1;
-          curr_up = 1;
-          return;
-        }
-
-        // Good packet received, yea!
-        if (!has_safelink || (pk->data[0] & 0x08) != curr_up<<3) {
-          // Push the queue head to push this packet and prepare the next
-          rxq_head = ((rxq_head+1)%RXQ_LEN);
-          curr_up = 1-curr_up;
-        }
-
-        if (!has_safelink || (pk->data[0]&0x04) != curr_down<<2) {
-          curr_down = 1-curr_down;
-          setupTx(false, false);
-        } else {
-          setupTx(true, false);
-        }
-      } else
-      {
-        // Push the queue head to push this packet and prepare the next
-        rxq_head = ((rxq_head+1)%RXQ_LEN);
-        // broadcast => no ack
-        NRF_RADIO->PACKETPTR = (uint32_t)&rxPackets[rxq_head];
-        NRF_RADIO->TASKS_START = 1UL;
-      }
-
+      // Good packet received, yea!
+      rxq_head = ((rxq_head+1)%RXQ_LEN);
+      setupTx(false);
 
       break;
     case doTx:
@@ -279,66 +184,40 @@ void esbInterruptHandler()
 // Don't use any extra added length besides the length field when sending
 #define PACKET1_STATIC_LENGTH            (0UL)
 // Max payload allowed in a packet
-#define PACKET1_PAYLOAD_SIZE             (63UL)
+#define PACKET1_PAYLOAD_SIZE             (32UL)
 
 void esbInit()
 {
   NRF_RADIO->POWER = 1;
+
   // Enable Radio interrupts
-  if (!softdevice_handler_is_enabled()) {
-    NVIC_SetPriority(RADIO_IRQn, 3);
-    NVIC_EnableIRQ(RADIO_IRQn);
-  } else {
-    NVIC_EnableIRQ(RADIO_IRQn);
-  }
-
-
-  NRF_RADIO->TXPOWER = (txpower << RADIO_TXPOWER_TXPOWER_Pos);
-
-  switch (datarate) {
-  case esbDatarate250K:
-      NRF_RADIO->MODE = (RADIO_MODE_MODE_Nrf_250Kbit << RADIO_MODE_MODE_Pos);
-      break;
-  case esbDatarate1M:
-      NRF_RADIO->MODE = (RADIO_MODE_MODE_Nrf_1Mbit << RADIO_MODE_MODE_Pos);
-      break;
-  case esbDatarate2M:
-      NRF_RADIO->MODE = (RADIO_MODE_MODE_Nrf_2Mbit << RADIO_MODE_MODE_Pos);
-      break;
-  }
-
-  NRF_RADIO->FREQUENCY = channel;
-
-  if (contwave) {
-    NRF_RADIO->TEST = 3;
-    NRF_RADIO->TASKS_RXEN = 1U;
-    return;
-  }
+  //NVIC_SetPriority(RADIO_IRQn, 1);
+  NVIC_EnableIRQ(RADIO_IRQn);
+  // Radio config
+  NRF_RADIO->TXPOWER = (RADIO_TXPOWER_TXPOWER_0dBm << RADIO_TXPOWER_TXPOWER_Pos);
+  esbSetChannel(0);
+  esbSetDatarate(esbDatarate2M);
 
   // Radio address config
-  // We use local addresses 0 and 1
-  //  * local address 0 is the unique address of the Crazyflie, used for 1-to-1 communication.
-  //    This can be set dynamically and the current address is stored in EEPROM.
-  //  * local address 1 is used for broadcasts
-  //    This is currently 0xFFE7E7E7E7.
-  NRF_RADIO->PREFIX0 = 0xC4C3FF00UL | (bytewise_bitswap(address >> 32) & 0xFF);  // Prefix byte of addresses 3 to 0
-  NRF_RADIO->PREFIX1 = 0xC5C6C7C8UL;  // Prefix byte of addresses 7 to 4
-  NRF_RADIO->BASE0   = bytewise_bitswap((uint32_t)address);  // Base address for prefix 0
-  NRF_RADIO->BASE1   = 0xE7E7E7E7UL;  // Base address for prefix 1-7
+  // Using logical address 0 so only BASE0 and PREFIX0 & 0xFF are used
+  NRF_RADIO->PREFIX0 = bytewise_bit_swap(0xC4C3C200UL | address[4]);  // Prefix byte of addresses 3 to 0
+  NRF_RADIO->PREFIX1 = bytewise_bit_swap(0xC5C6C7C8UL);  // Prefix byte of addresses 7 to 4
+  NRF_RADIO->BASE0   = bytewise_bit_swap(*(uint32_t*)address); //*(uint32_t*)&address[0];  // Base address for prefix 0
+  NRF_RADIO->BASE1   = bytewise_bit_swap(0x00C2C2C2UL);  // Base address for prefix 1-7
   NRF_RADIO->TXADDRESS = 0x00UL;      // Set device address 0 to use when transmitting
-  NRF_RADIO->RXADDRESSES = (1<<0) | (1<<1);    // Enable device address 0 and 1 to use which receiving
+  NRF_RADIO->RXADDRESSES = 0x01UL;    // Enable device address 0 to use which receiving
 
   // Packet configuration
   NRF_RADIO->PCNF0 = (PACKET0_S1_SIZE << RADIO_PCNF0_S1LEN_Pos) |
                      (PACKET0_S0_SIZE << RADIO_PCNF0_S0LEN_Pos) |
-                     (PACKET0_PAYLOAD_SIZE << RADIO_PCNF0_LFLEN_Pos);
+                     (PACKET0_PAYLOAD_SIZE << RADIO_PCNF0_LFLEN_Pos); //lint !e845 "The right argument to operator '|' is certain to be 0"
 
   // Packet configuration
    NRF_RADIO->PCNF1 = (RADIO_PCNF1_WHITEEN_Disabled << RADIO_PCNF1_WHITEEN_Pos)    |
                       (RADIO_PCNF1_ENDIAN_Big << RADIO_PCNF1_ENDIAN_Pos)           |
                       (PACKET1_BASE_ADDRESS_LENGTH << RADIO_PCNF1_BALEN_Pos)       |
                       (PACKET1_STATIC_LENGTH << RADIO_PCNF1_STATLEN_Pos)           |
-                      (PACKET1_PAYLOAD_SIZE << RADIO_PCNF1_MAXLEN_Pos);
+                      (PACKET1_PAYLOAD_SIZE << RADIO_PCNF1_MAXLEN_Pos); //lint !e845 "The right argument to operator '|' is certain to be 0"
 
   // CRC Config
   NRF_RADIO->CRCCNF = (RADIO_CRCCNF_LEN_Two << RADIO_CRCCNF_LEN_Pos); // Number of checksum bits
@@ -358,34 +237,11 @@ void esbInit()
   rs = doRx;
 	NRF_RADIO->PACKETPTR = (uint32_t)&rxPackets[rxq_head];
   NRF_RADIO->TASKS_RXEN = 1U;
-
-  isInit = true;
-}
-
-void esbReset()
-{
-  if (!isInit) return;
-
-  if (!softdevice_handler_is_enabled()) {
-    __disable_irq();
-  }
-
-  NRF_RADIO->TASKS_DISABLE = 1;
-  NRF_RADIO->POWER = 0;
-
-  NVIC_GetPendingIRQ(RADIO_IRQn);
-  __enable_irq();
-
-  if (!softdevice_handler_is_enabled()) {
-    esbInit();
-  }
 }
 
 void esbDeinit()
 {
-  if (!softdevice_handler_is_enabled()) {
-    NVIC_DisableIRQ(RADIO_IRQn);
-  }
+  NVIC_DisableIRQ(RADIO_IRQn);
 
   NRF_RADIO->INTENCLR = RADIO_INTENSET_END_Msk;
   NRF_RADIO->SHORTS = 0;
@@ -435,92 +291,29 @@ void esbSendTxPacket()
   txq_head = (txq_head+1)%TXQ_LEN;
 }
 
-void esbSendP2PPacket(uint8_t port, char *data, uint8_t length)
+void esbSetDatarate(EsbDatarate datarate)
 {
-  p2pPacket.size = length + 2;
-  p2pPacket.ack = 0;
-  p2pPacket.data[0]= 0xff;
-  p2pPacket.data[1] = 0x80|(port&0x0f);
-
-  memcpy(&p2pPacket.data[2], data, sizeof(uint8_t)*length);
-  // Message pointer to Nrf radio
-  NRF_RADIO->PACKETPTR = (uint32_t)&p2pPacket;
-  // The indicator that the message is neither ACKed based or broadcast based, but specifically between drones
-  NRF_RADIO->TXADDRESS = 0x01UL;
-  // Put NRF_Radio to TX mode
-  NRF_RADIO->SHORTS &= ~RADIO_SHORTS_DISABLED_RXEN_Msk;
-  NRF_RADIO->SHORTS |= RADIO_SHORTS_DISABLED_TXEN_Msk;
-  NRF_RADIO->TASKS_DISABLE = 1UL; // By disabling the task, the package is send
-
-  rs = doTx;
-
+  switch (datarate) {
+	case esbDatarate250K:
+		  NRF_RADIO->MODE = (RADIO_MODE_MODE_Nrf_250Kbit << RADIO_MODE_MODE_Pos);
+		  break;
+	case esbDatarate1M:
+		  NRF_RADIO->MODE = (RADIO_MODE_MODE_Nrf_1Mbit << RADIO_MODE_MODE_Pos);
+		  break;
+	case esbDatarate2M:
+		  NRF_RADIO->MODE = (RADIO_MODE_MODE_Nrf_2Mbit << RADIO_MODE_MODE_Pos);
+		  break;
+	}
 }
 
-
-void esbSetDatarate(EsbDatarate dr)
-{
-  datarate = dr;
-
-  esbReset();
-}
-
-
-#ifdef BLE
-void ble_advertising_stop(void);
-void advertising_start(void);
-void ble_sd_stop(void);
-#endif
-
-void esbSetContwave(bool enable)
-{
-  contwave = enable;
-
-#ifdef BLE
-  if (softdevice_handler_is_enabled()) {
-    if (enable) {
-      // ble_advertising_stop();
-    } else {
-      // advertising_start();
-    }
-  }
-#endif
-
-  esbReset();
-}
-
-void esbSetChannel(unsigned int ch)
+void esbSetChannel(unsigned int channel)
 {
   if (channel < 126) {
-	  channel = ch;
+	  NRF_RADIO->FREQUENCY = channel;
 	}
-
-  esbReset();
 }
 
-void esbSetTxPower(int power)
-{
-  txpower = power;
-
-  esbReset();
+void esbSetAddress(char *addr) {
+  memcpy(address, addr, 5);
 }
 
-void esbSetTxPowerDbm(int8_t powerDbm)
-{
-  if      (powerDbm <= -30) { txpower = RADIO_TXPOWER_TXPOWER_Neg30dBm; }
-  else if (powerDbm <= -20) { txpower = RADIO_TXPOWER_TXPOWER_Neg20dBm; }
-  else if (powerDbm <= -16) { txpower = RADIO_TXPOWER_TXPOWER_Neg16dBm; }
-  else if (powerDbm <= -12) { txpower = RADIO_TXPOWER_TXPOWER_Neg12dBm; }
-  else if (powerDbm <= -8)  { txpower = RADIO_TXPOWER_TXPOWER_Neg8dBm; }
-  else if (powerDbm <= -4)  { txpower = RADIO_TXPOWER_TXPOWER_Neg4dBm; }
-  else if (powerDbm <=  0)  { txpower = RADIO_TXPOWER_TXPOWER_0dBm; }
-  else if (powerDbm >=  4)  { txpower = RADIO_TXPOWER_TXPOWER_Pos4dBm; }
-
-  esbReset();
-}
-
-void esbSetAddress(uint64_t addr)
-{
-  address = addr;
-
-  esbReset();
-}

@@ -21,40 +21,23 @@
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library.
  */
-#ifndef __PACKET_H__
-#define __PACKET_H__
+#ifndef __BUTTON_H__
+#define __BUTTON_H__
 
-#include <stdbool.h>
-#include <stdint.h>
+//#include "pinout.h"
+#include "boards.h"
+#include <nrf.h>
 
-#define SYSLINK_MTU 32
+typedef enum {
+  buttonIdle = 0,
+  buttonShortPress,
+  buttonLongPress
+} ButtonEvent;
 
-struct syslinkPacket {
-  uint8_t type;
-  uint8_t length;
-  char data[SYSLINK_MTU];
-};
+void buttonInit(ButtonEvent initialEvent);
 
-bool syslinkReceive(struct syslinkPacket *packet);
+void buttonProcess();
 
-bool syslinkSend(struct syslinkPacket *packet);
+ButtonEvent buttonGetState();
 
-
-// Defined packet types
-#define SYSLINK_RADIO_RAW      0x00
-#define SYSLINK_RADIO_CHANNEL  0x01
-#define SYSLINK_RADIO_DATARATE 0x02
-
-
-#define SYSLINK_PM_SOURCE 0x10
-
-#define SYSLINK_PM_ONOFF_SWITCHOFF 0x11
-
-#define SYSLINK_PM_BATTERY_VOLTAGE 0x12
-#define SYSLINK_PM_BATTERY_STATE   0x13
-#define SYSLINK_PM_BATTERY_AUTOUPDATE 0x14
-
-#define SYSLINK_OW_SCAN 0x20
-#define SYSLINK_OW_READ 0x21
-
-#endif
+#endif //__BUTTON_H__

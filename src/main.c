@@ -86,6 +86,12 @@
 #include "crazyflie2_pm.h"
 #include "esb.h"
 #include "timeslot.h"
+#include "button.h"
+#include "uart.h"
+#include "systick.h"
+#include "bootloader.h"
+
+#include "crtp.h"
 
 #define NRF_LOG_MODULE_NAME "APP"
 #include "nrf_log.h"
@@ -534,9 +540,9 @@ static void advertising_init(void)
     APP_ERROR_CHECK(err_code);
 }
 
-static struct syslinkPacket m_syslink_packet;
-static void handle_syslink_packet(struct syslinkPacket *packet);
-
+// static struct syslinkPacket m_syslink_packet;
+// static void handle_syslink_packet(struct syslinkPacket *packet);
+void mainLoop(void);
 /**@brief Function for application main entry.
  */
 int main(void)
@@ -558,11 +564,11 @@ int main(void)
     services_init();
     conn_params_init();
 
-    err_code = syslinkInit();
-    APP_ERROR_CHECK(err_code);
+    // err_code = syslinkInit();
+    // APP_ERROR_CHECK(err_code);
 
-    crazyflie2_pm_init();
-    crazyflie2_pm_set_state(PM_STATE_SYSTEM_ON);
+    // crazyflie2_pm_init();
+    // crazyflie2_pm_set_state(PM_STATE_SYSTEM_ON);
 
     err_code = app_mailbox_create(&m_uplink);
     APP_ERROR_CHECK(err_code);
@@ -576,62 +582,156 @@ int main(void)
     err_code = timeslot_start();
     APP_ERROR_CHECK(err_code);
 
-    // Enter main loop.
-    for (;;)
-    {
-        NRF_LOG_PROCESS();
 
-        uint16_t length;
-        if ((app_mailbox_sized_get(&m_uplink, m_syslink_packet.data, &length) == NRF_SUCCESS) && !syslink_is_tx_busy()) {
-            m_syslink_packet.length = length;
-            m_syslink_packet.type = SYSLINK_RADIO_RAW;
-            err_code = syslinkSend(&m_syslink_packet);
-            APP_ERROR_CHECK(err_code);
-        }
+#ifdef HAS_TI_CHARGER
+  // Enable 500mA USB input and enable battery charging
+  nrf_gpio_cfg_output(PM_EN1);
+  nrf_gpio_pin_set(PM_EN1);
+  nrf_gpio_cfg_output(PM_EN2);
+  nrf_gpio_pin_clear(PM_EN2);
+  nrf_gpio_cfg_output(PM_CHG_EN);
+  nrf_gpio_pin_clear(PM_CHG_EN);
+#endif
 
-        if (syslinkReceive(&m_syslink_packet) == true) {
-            NRF_LOG_INFO("Packet received!\n");
-            handle_syslink_packet(&m_syslink_packet);
-        }
-    }
+  // Power STM32, hold reset
+  nrf_gpio_cfg_output(VEN_D);
+  nrf_gpio_pin_set(VEN_D);
+  nrf_gpio_cfg_output(STM_NRST_PIN);
+  nrf_gpio_pin_clear(STM_NRST_PIN);
+
+  // Set flow control and activate pull-down on RX data pin
+  nrf_gpio_cfg_output(TX_PIN_NUMBER);
+  nrf_gpio_pin_set(TX_PIN_NUMBER);
+  nrf_gpio_cfg_output(RTS_PIN_NUMBER);
+  nrf_gpio_pin_set(RTS_PIN_NUMBER);
+  nrf_gpio_cfg_input(RX_PIN_NUMBER, NRF_GPIO_PIN_PULLDOWN);
+
+
+  nrf_gpio_pin_set(STM_NRST_PIN);
+
+  systickInit();
+  buttonInit(buttonIdle);
+
+  mainLoop();
+
+  while (1);
+  return 0;
+
 }
 
-static void handle_syslink_packet(struct syslinkPacket *packet) {
-    int err_code;
-    switch (packet->type) {
-        case SYSLINK_RADIO_RAW:
-            err_code = ble_crazyflie_send_packet(&m_crazyflie, (void*) packet->data, packet->length);
-            if (err_code != NRF_SUCCESS) {
-                // Todo: this packet should be sent later and not dropped ...
-                // no more syslink packet should be received until this one is sent?
-                NRF_LOG_INFO("Error sending packet: %x\n", err_code);
-            }
-            break;
-        case SYSLINK_RADIO_CHANNEL:
-            NRF_LOG_INFO("Setting channel: %d\n", packet->data[0]);
-            syslinkSendBlocking(packet);
-            break;
-        case SYSLINK_PM_LED_ON:
-            NRF_LOG_INFO("LED ON\n");
-            nrf_gpio_pin_write(LED_1, LEDS_ACTIVE_STATE);
-            syslinkSendBlocking(packet);
-            break;
-        case SYSLINK_PM_LED_OFF:
-            NRF_LOG_INFO("LED OFF\n");
-            nrf_gpio_pin_write(LED_1, !LEDS_ACTIVE_STATE);
-            syslinkSendBlocking(packet);
-            break;
-        case SYSLINK_SYS_NRF_VERSION:
-            NRF_LOG_INFO("NRF version request\n");
-            packet->length = strlen("2024.01") + 1;
-            memcpy(packet->data, "2024.01", packet->length);
-            syslinkSendBlocking(packet);
-            break;
-        default:
-            break;
-    }
-}
+static enum {connect_idle, connect_ble, connect_sb} cstate = connect_idle;
 
+void mainLoop(void) {
+  bool resetToFw = false;
+  static CrtpPacket crtpPacket;
+  static bool stmStarted = false;
+
+  while (!resetToFw) {
+    EsbPacket *packet;
+    buttonProcess();
+
+    if (buttonGetState() != buttonIdle) {
+      resetToFw = true;
+    }
+
+    if ((stmStarted == false) && (nrf_gpio_pin_read(RX_PIN_NUMBER))) {
+      nrf_gpio_cfg_input(RTS_PIN_NUMBER, NRF_GPIO_PIN_NOPULL);
+      uartInit();
+      stmStarted = true;
+    }
+
+
+    if (cstate != connect_ble) {
+      packet = esbGetRxPacket();
+      if (packet != NULL) {
+
+        if ( ((packet->size >= 2) &&
+              (packet->data[0]==0xff) &&
+              (packet->data[1]==0xff)) ||
+             ((packet->size >= 2) &&
+              (packet->data[0]==0xff) &&
+              (packet->data[1]==0xfe))
+           ) {
+          // Disable Bluetooth advertizing when receiving a bootloader SB packet
+          if (cstate == connect_idle) {
+            //sd_ble_gap_adv_stop();
+            cstate = connect_sb;
+          }
+        }
+
+        // If we are connected SB, the packet is read and used
+        if (cstate == connect_sb) {
+          memcpy(crtpPacket.raw, packet->data, packet->size);
+          crtpPacket.datalen = packet->size-1;
+        }
+        esbReleaseRxPacket(packet);
+      }
+    }
+    // if (cstate != connect_sb) {
+    //   if (bleCrazyfliesIsPacketReceived()) {
+    //     cstate = connect_ble;
+
+    //     packet = bleCrazyfliesGetRxPacket();
+    //     memcpy(crtpPacket.raw, packet->data, packet->size);
+    //     crtpPacket.datalen = packet->size-1;
+    //     bleCrazyfliesReleaseRxPacket(packet);
+    //   }
+    // }
+
+    if (crtpPacket.datalen != 0xffu) {
+      struct syslinkPacket slPacket;
+      slPacket.type = SYSLINK_RADIO_RAW;
+      memcpy(slPacket.data, crtpPacket.raw, crtpPacket.datalen+1);
+      slPacket.length = crtpPacket.datalen+1;
+
+      if (bootloaderProcess(&crtpPacket) == false) {
+        // Send packet to stm32
+        syslinkSend(&slPacket);
+
+        crtpPacket.datalen = 0xFFU;
+        // If packet received from stm32, send it back
+        if (syslinkReceive(&slPacket)) {
+          if (slPacket.type == SYSLINK_RADIO_RAW) {
+            memcpy(crtpPacket.raw, slPacket.data, slPacket.length);
+            crtpPacket.datalen = slPacket.length-1;
+          }
+        }
+      }
+    }
+    if (crtpPacket.datalen != 0xFFU) {
+      if (cstate == connect_sb) {
+        EsbPacket *pk = esbGetTxPacket();
+        if (pk) {
+          memcpy(pk->data, crtpPacket.raw, crtpPacket.datalen+1);
+          pk->size = crtpPacket.datalen+1;
+          esbSendTxPacket(pk);
+        }
+      }
+    //    else if (cstate == connect_ble) {
+    //     static EsbPacket pk;
+    //     memcpy(pk.data, crtpPacket.raw, crtpPacket.datalen+1);
+    //     pk.size = crtpPacket.datalen+1;
+    //     bleCrazyfliesSendPacket(&pk);
+    //   }
+    }
+
+    crtpPacket.datalen = 0xFFU;
+
+    // Blink the LED
+    if (NRF_TIMER1->EVENTS_COMPARE[0]) {
+      NRF_TIMER1->EVENTS_COMPARE[0] = 0;
+#ifndef DEBUG_TIMESLOT
+      NRF_GPIOTE->TASKS_OUT[0] = 1;
+#endif
+    }
+  }
+
+  //Set bit 0x20 forces boot to firmware
+  NRF_POWER->GPREGRET |= 0x20U;
+  sd_nvic_SystemReset();
+
+  while(1);
+}
 
 /**
  * @}

@@ -33,13 +33,17 @@ SRC_FILES += \
   $(SDK_ROOT)/components/drivers_nrf/clock/nrf_drv_clock.c \
   $(SDK_ROOT)/components/drivers_nrf/common/nrf_drv_common.c \
   $(SDK_ROOT)/components/drivers_nrf/gpiote/nrf_drv_gpiote.c \
-  $(SDK_ROOT)/components/drivers_nrf/uart/nrf_drv_uart.c \
   $(PROJ_DIR)/main.c \
   $(PROJ_DIR)/ble_crazyflie.c \
   $(PROJ_DIR)/syslink.c \
   $(PROJ_DIR)/crazyflie2_pm.c \
   $(PROJ_DIR)/esb.c \
   $(PROJ_DIR)/timeslot.c \
+  $(PROJ_DIR)/button.c \
+  $(PROJ_DIR)/systick.c \
+  $(PROJ_DIR)/uart.c \
+  $(PROJ_DIR)/bootloader.c \
+  $(PROJ_DIR)/crc.c \
   $(SDK_ROOT)/external/segger_rtt/RTT_Syscalls_GCC.c \
   $(SDK_ROOT)/external/segger_rtt/SEGGER_RTT.c \
   $(SDK_ROOT)/external/segger_rtt/SEGGER_RTT_printf.c \

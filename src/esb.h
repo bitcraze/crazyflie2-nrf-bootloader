@@ -5,8 +5,8 @@
  * +------+    / /_/ / / /_/ /__/ /  / /_/ / / /_/  __/
  *  ||  ||    /_____/_/\__/\___/_/   \__,_/ /___/\___/
  *
- * Crazyflie 2.0 NRF Firmware
- * Copyright (c) 2014, Bitcraze AB, All rights reserved.
+ * Crazyflie 2.0 nRF51 Bootloader
+ * Copyright (c) 2014, Bitcraze AB
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -37,18 +37,15 @@ typedef struct esbPacket_s {
     union {
       uint8_t s1;
       struct {
-        uint8_t ack :1;
+        uint8_t noack :1;
         uint8_t pid :2;
       };
     };
-    uint8_t data[63];
+    uint8_t data[32];
   } __attribute__((packed));
   /* Written by the radio interrupt routine */
-  /* Since the value of the RSSI sample can only be between ~[0, 100] we down cast
-   * from uint32_t to uint8_t without lose of precision */
-  uint8_t rssi;
+  int rssi;
   unsigned int crc;
-  uint8_t match;
 } EsbPacket;
 
 typedef enum esbDatarate_e { esbDatarate250K=0,
@@ -60,15 +57,13 @@ typedef enum esbDatarate_e { esbDatarate250K=0,
 #define RADIO_RATE_1M esbDatarate1M
 #define RADIO_RATE_2M esbDatarate2M
 
-#define ESB_UNICAST_ADDRESS_MATCH 0
-#define ESB_MULTICAST_ADDRESS_MATCH 1
-
 /* Initialize the radio for ESB */
 void esbInit();
 
 /* Stop ESB and free the radio */
 void esbDeinit();
 
+/* Radio interrupt handler */
 void esbInterruptHandler();
 
 /* Return true is a packet has been received and is ready to read */
@@ -86,9 +81,6 @@ bool esbCanTxPacket();
 /* Return the address of the next TX packet in the TX queue */
 EsbPacket * esbGetTxPacket();
 
-/* Immediately send a peer 2 peer packet in TX */
-void esbSendP2PPacket(uint8_t port, char *data, uint8_t length);
-
 /* Release and set for sending the buffer returned by getTxPacket */
 void esbSendTxPacket();
 
@@ -98,16 +90,8 @@ void esbSetDatarate(EsbDatarate datarate);
 /* Set channel */
 void esbSetChannel(unsigned int channel);
 
-/* Set output power (according to nRF51 defines)*/
-void esbSetTxPower(int power);
+/* Set TX and RX radio link address */
+void esbSetAddress(char *address);
 
-/* Set output power in Dbm*/
-void esbSetTxPowerDbm(int8_t powerDbm);
-
-/* Set of disable radio continuous wave */
-void esbSetContwave(bool enable);
-
-/* Set the address of the radio */
-void esbSetAddress(uint64_t address);
 
 #endif //__ESB_H__

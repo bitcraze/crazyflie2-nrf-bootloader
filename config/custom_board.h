@@ -48,7 +48,11 @@
 #define PM_CHG_EN 7
 #define VEN_D 10
 
+#define STM_NRST_PIN 21
+
 // Pins if RFX2411N is used
 #define RADIO_PA_RX_EN  20
 #define RADIO_PA_ANT_SW 18
 #define RADIO_PA_MODE   19
+
+#define HAS_TI_CHARGER 1
