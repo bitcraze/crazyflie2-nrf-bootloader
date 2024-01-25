@@ -27,17 +27,17 @@
 #include <stdbool.h>
 #include <ble.h>
 #include "crtp.h"
+#include <nrf_mbr.h>
 
 #define BUFFER_PAGES 1
 #define FLASH_PAGES  232
-#define FLASH_START  88
+#define FLASH_START  108
 
 #define PAGE_SIZE 1024
 
 #define FLASH_BASE 0x00000000
 #define FLASH_SIZE (256*1024)
 
-#define MBR_SIZE (4*1024)
 #define MBS_SIZE (4*1024)
 
 //Public functions

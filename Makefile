@@ -242,5 +242,12 @@ flash_softdevice:
 	nrfjprog --program $(SDK_ROOT)/components/softdevice/s130/hex/s130_nrf51_2.0.1_softdevice.hex -f nrf51 --sectorerase 
 	nrfjprog --reset -f nrf51
 
+flash_mbs:
+	nrfjprog --program nrf_mbs_cf21.hex -f nrf51 --sectorerase 
+	nrfjprog --memwr 0x10001014 --val 0x3F000 -f nrf51
+	nrfjprog --memwr 0x4001e504 --val 0x01 -f nrf51
+	nrfjprog --memwr 0x10001080 --val 0x3A000 -f nrf51
+	nrfjprog --reset -f nrf51
+
 erase:
 	nrfjprog --eraseall -f nrf52

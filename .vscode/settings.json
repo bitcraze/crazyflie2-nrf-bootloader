@@ -8,7 +8,9 @@
         "crazyflie2_pm.h": "c",
         "boards.h": "c",
         "timeslot.h": "c",
-        "button.h": "c"
+        "button.h": "c",
+        "ble_hci.h": "c",
+        "nrf_mbr.h": "c"
     },
     "cortex-debug.variableUseNaturalFormat": false
 }

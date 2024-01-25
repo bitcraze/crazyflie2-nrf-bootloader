@@ -72,6 +72,7 @@
 #include "app_mailbox.h"
 #include "fstorage.h"
 #include "fds.h"
+#include <nrf_mbr.h>
 
 #include "sensorsim.h"
 #include "nrf_gpio.h"
@@ -559,6 +560,12 @@ static void advertising_init(void)
     APP_ERROR_CHECK(err_code);
 }
 
+#define BOOTLOADER_ADDRESS 0x0003A000
+
+static sd_mbr_command_t startSdCmd = {
+  .command = SD_MBR_COMMAND_INIT_SD,
+};
+
 // static struct syslinkPacket m_syslink_packet;
 // static void handle_syslink_packet(struct syslinkPacket *packet);
 void mainLoop(void);
@@ -567,6 +574,9 @@ void mainLoop(void);
 int main(void)
 {
     uint32_t err_code;
+
+    sd_mbr_command(&startSdCmd);
+    sd_softdevice_vector_table_base_set(BOOTLOADER_ADDRESS);
 
     // Initialize.
     err_code = NRF_LOG_INIT(NULL);
