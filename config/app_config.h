@@ -22,3 +22,5 @@
 #define FDS_ENABLED 0
 
 #define APP_TIMER_ENABLED 1
+
+#define BLE_DIS_ENABLED 1

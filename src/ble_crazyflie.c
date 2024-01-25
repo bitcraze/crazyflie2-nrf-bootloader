@@ -310,6 +310,7 @@ uint32_t ble_crazyflie_send_packet(ble_crazyflie_t *p_crazyflie, uint8_t *p_data
         memcpy(packet+1, p_data, GATT_MTU_SIZE_DEFAULT - 3 - 1);
         err_code = send_crtpdown_notification(p_crazyflie, packet, GATT_MTU_SIZE_DEFAULT - 3 - 1 + 1);
         VERIFY_SUCCESS(err_code);
+        packet[0] &= ~(0x80);  // Clear start flag
         memcpy(packet+1, p_data+GATT_MTU_SIZE_DEFAULT - 3, length - (GATT_MTU_SIZE_DEFAULT - 3 - 1));
         err_code = send_crtpdown_notification(p_crazyflie, packet, length - (GATT_MTU_SIZE_DEFAULT - 3 - 1) + 1);
         VERIFY_SUCCESS(err_code);

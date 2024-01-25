@@ -79,6 +79,7 @@
 #include "ble_advdata.h"
 #include "ble_advertising.h"
 #include "ble_conn_state.h"
+#include "ble_dis.h"
 
 #include "ble_crazyflie.h"
 
@@ -108,7 +109,7 @@
 #define CENTRAL_LINK_COUNT              0                                           /**< Number of central links used by the application. When changing this number remember to adjust the RAM settings*/
 #define PERIPHERAL_LINK_COUNT           1                                           /**< Number of peripheral links used by the application. When changing this number remember to adjust the RAM settings*/
 
-#define DEVICE_NAME                     "Crazyflie"                                /**< Name of device. Will be included in the advertising data. */
+#define DEVICE_NAME                     "Crazyflie Loader"                                /**< Name of device. Will be included in the advertising data. */
 #define MANUFACTURER_NAME               "Bitcraze AB"                               /**< Manufacturer. Will be passed to Device Information Service. */
 #define APP_ADV_INTERVAL                300                                         /**< The advertising interval (in units of 0.625 ms. This value corresponds to 187.5 ms). */
 #define APP_ADV_TIMEOUT_IN_SECONDS      180                                         /**< The advertising timeout in units of seconds. */
@@ -148,7 +149,9 @@ static ble_crazyflie_t m_crazyflie;
 APP_MAILBOX_DEF(m_uplink, 32*4, sizeof(uint8_t));
 
 // YOUR_JOB: Use UUIDs for service(s) used in your application.
-static ble_uuid_t m_adv_uuids[] = {{BLE_UUID_DEVICE_INFORMATION_SERVICE, BLE_UUID_TYPE_BLE}}; /**< Universally unique service identifiers. */
+static ble_uuid_t m_adv_uuids[] = {
+  {BLE_UUID_DEVICE_INFORMATION_SERVICE, BLE_UUID_TYPE_BLE}};
+ static ble_uuid_t m_adv_uuids_sr[] = {{0x0201, 2}}; /**< Universally unique service identifiers. */
 
 /**@brief Callback function for asserts in the SoftDevice.
  *
@@ -207,7 +210,7 @@ static void gap_params_init(void)
     APP_ERROR_CHECK(err_code);
 
     // YOUR_JOB: Use an appearance value matching the application's use case.
-    err_code = sd_ble_gap_appearance_set(BLE_APPEARANCE_GENERIC_REMOTE_CONTROL);
+    err_code = sd_ble_gap_appearance_set(BLE_APPEARANCE_UNKNOWN);
     APP_ERROR_CHECK(err_code);
 
     memset(&gap_conn_params, 0, sizeof(gap_conn_params));
@@ -240,10 +243,21 @@ static void services_init(void)
         .data_handler = handle_crazyflie_data,
     };
 
-
     err_code = ble_crazyflie_init(&m_crazyflie, &crazyflie_init);
     APP_ERROR_CHECK(err_code);
 
+    ble_dis_init_t dis_init;
+
+    // Initialize Device Information Service
+    memset(&dis_init, 0, sizeof(dis_init));
+
+    ble_srv_ascii_to_utf8(&dis_init.manufact_name_str, MANUFACTURER_NAME);
+
+    BLE_GAP_CONN_SEC_MODE_SET_OPEN(&dis_init.dis_attr_md.read_perm);
+    BLE_GAP_CONN_SEC_MODE_SET_NO_ACCESS(&dis_init.dis_attr_md.write_perm);
+
+    err_code = ble_dis_init(&dis_init);
+    APP_ERROR_CHECK(err_code);
 }
 
 
@@ -520,6 +534,7 @@ static void advertising_init(void)
 {
     uint32_t               err_code;
     ble_advdata_t          advdata;
+    ble_advdata_t          srdata;
     ble_adv_modes_config_t options;
 
     // Build advertising data struct to pass into @ref ble_advertising_init.
@@ -528,8 +543,12 @@ static void advertising_init(void)
     advdata.name_type               = BLE_ADVDATA_FULL_NAME;
     advdata.include_appearance      = true;
     advdata.flags                   = BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE;
-    advdata.uuids_complete.uuid_cnt = sizeof(m_adv_uuids) / sizeof(m_adv_uuids[0]);
-    advdata.uuids_complete.p_uuids  = m_adv_uuids;
+    advdata.uuids_more_available.uuid_cnt = sizeof(m_adv_uuids) / sizeof(m_adv_uuids[0]);
+    advdata.uuids_more_available.p_uuids  = m_adv_uuids;
+
+    memset(&srdata, 0, sizeof(srdata));
+    srdata.uuids_complete.uuid_cnt = sizeof(m_adv_uuids_sr) / sizeof(m_adv_uuids_sr[0]);
+    srdata.uuids_complete.p_uuids  = m_adv_uuids_sr;
 
     memset(&options, 0, sizeof(options));
     options.ble_adv_fast_enabled  = true;
@@ -553,6 +572,8 @@ int main(void)
     err_code = NRF_LOG_INIT(NULL);
     APP_ERROR_CHECK(err_code);
 
+    NRF_LOG_INFO("Hello?\n");
+
     // Light up LED
     nrf_gpio_cfg_output(LED_1);
     nrf_gpio_pin_write(LED_1, LEDS_ACTIVE_STATE);
@@ -560,8 +581,8 @@ int main(void)
     timers_init();
     ble_stack_init();
     gap_params_init();
-    advertising_init();
     services_init();
+    advertising_init();
     conn_params_init();
 
     // err_code = syslinkInit();
@@ -667,16 +688,13 @@ void mainLoop(void) {
         esbReleaseRxPacket(packet);
       }
     }
-    // if (cstate != connect_sb) {
-    //   if (bleCrazyfliesIsPacketReceived()) {
-    //     cstate = connect_ble;
-
-    //     packet = bleCrazyfliesGetRxPacket();
-    //     memcpy(crtpPacket.raw, packet->data, packet->size);
-    //     crtpPacket.datalen = packet->size-1;
-    //     bleCrazyfliesReleaseRxPacket(packet);
-    //   }
-    // }
+    if (cstate != connect_sb) {
+      uint16_t full_size = 0;
+      if (app_mailbox_sized_get(&m_uplink, crtpPacket.raw, &full_size) == NRF_SUCCESS) {
+        crtpPacket.datalen = full_size - 1;
+        cstate = connect_ble;
+      }
+    }
 
     if (crtpPacket.datalen != 0xffu) {
       struct syslinkPacket slPacket;
@@ -706,13 +724,9 @@ void mainLoop(void) {
           pk->size = crtpPacket.datalen+1;
           esbSendTxPacket(pk);
         }
+      } else if (cstate == connect_ble) {
+        ble_crazyflie_send_packet(&m_crazyflie, (uint8_t*) crtpPacket.raw, crtpPacket.datalen+1);
       }
-    //    else if (cstate == connect_ble) {
-    //     static EsbPacket pk;
-    //     memcpy(pk.data, crtpPacket.raw, crtpPacket.datalen+1);
-    //     pk.size = crtpPacket.datalen+1;
-    //     bleCrazyfliesSendPacket(&pk);
-    //   }
     }
 
     crtpPacket.datalen = 0xFFU;

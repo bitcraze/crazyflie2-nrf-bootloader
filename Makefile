@@ -55,6 +55,7 @@ SRC_FILES += \
   $(SDK_ROOT)/components/toolchain/gcc/gcc_startup_nrf51.S \
   $(SDK_ROOT)/components/toolchain/system_nrf51.c \
   $(SDK_ROOT)/components/softdevice/common/softdevice_handler/softdevice_handler.c \
+  $(SDK_ROOT)/components/ble/ble_services/ble_dis/ble_dis.c
 
 # Include folders common to all targets
 INC_FOLDERS += \
@@ -161,6 +162,7 @@ INC_FOLDERS += \
   $(SDK_ROOT)/components/softdevice/common/softdevice_handler \
   $(SDK_ROOT)/components/ble/ble_services/ble_hrs \
   $(SDK_ROOT)/components/libraries/log/src \
+  $(SDK_ROOT)/components/ble/ble_services/ble_dis \
 
 # Libraries common to all targets
 LIB_FILES += \
