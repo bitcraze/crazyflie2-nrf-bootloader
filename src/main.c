@@ -488,6 +488,8 @@ static void sys_evt_dispatch(uint32_t sys_evt)
     // pending flash operations in fstorage. Let fstorage process system events first,
     // so that it can report correctly to the Advertising module.
     ble_advertising_on_sys_evt(sys_evt);
+
+    bootloaderOnSdEvt(sys_evt);
 }
 
 
@@ -561,6 +563,18 @@ static void advertising_init(void)
 }
 
 #define BOOTLOADER_ADDRESS 0x0003A000
+#define FW_ADDRESS 0x0001B000
+
+void start_firmware() __attribute__ ((noreturn, naked));
+void start_firmware() {
+  void (*fw_start)(void) = *(void (**)(void))(FW_ADDRESS + 4);
+
+  sd_softdevice_vector_table_base_set(FW_ADDRESS);
+  __set_MSP(*(uint32_t*)FW_ADDRESS);
+  fw_start();
+
+  while (1);
+}
 
 static sd_mbr_command_t startSdCmd = {
   .command = SD_MBR_COMMAND_INIT_SD,
@@ -577,6 +591,13 @@ int main(void)
 
     sd_mbr_command(&startSdCmd);
     sd_softdevice_vector_table_base_set(BOOTLOADER_ADDRESS);
+
+        // If the master boot switch has detected short or no click: boot the firmware
+    if (((NRF_POWER->GPREGRET & 0x86U) != 0x82U) &&
+        ((NRF_POWER->GPREGRET & 0x40U) != 0x40U) &&
+        (*(uint32_t *)FW_ADDRESS != 0xFFFFFFFFU) ) {
+      start_firmware();
+    }
 
     // Initialize.
     err_code = NRF_LOG_INIT(NULL);
