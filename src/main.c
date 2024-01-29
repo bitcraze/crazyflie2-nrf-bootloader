@@ -1,6 +1,6 @@
 /**
  * Copyright (c) 2014 - 2017, Nordic Semiconductor ASA
- * Copyright (c) 2023, Bitcraze AB
+ * Copyright (c) 2024, Bitcraze AB
  * 
  * All rights reserved.
  * 
@@ -37,20 +37,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * 
- */
-
-/** @file
- *
- * @defgroup ble_sdk_app_template_main main.c
- * @{
- * @ingroup ble_sdk_app_template
- * @brief Template project main file.
- *
- * This file contains a template for creating a new application. It has the code necessary to wakeup
- * from button, advertise, get a connection restart advertising on disconnect and if no new
- * connection created go back to system-off mode.
- * It can easily be used as a starting point for creating a new application, the comments identified
- * with 'YOUR_JOB' indicates where and how you can customize.
  */
 
 #include <stdbool.h>
@@ -140,19 +126,13 @@
 
 static uint16_t m_conn_handle = BLE_CONN_HANDLE_INVALID;                            /**< Handle of the current connection. */
 
-/* YOUR_JOB: Declare all services structure your application is using
-   static ble_xx_service_t                     m_xxs;
-   static ble_yy_service_t                     m_yys;
- */
 static ble_crazyflie_t m_crazyflie;
 
 /* Up to 4 full packets can be buffered there*/
 APP_MAILBOX_DEF(m_uplink, 32*4, sizeof(uint8_t));
 
-// YOUR_JOB: Use UUIDs for service(s) used in your application.
 static ble_uuid_t m_adv_uuids[] = {
   {BLE_UUID_DEVICE_INFORMATION_SERVICE, BLE_UUID_TYPE_BLE}};
- static ble_uuid_t m_adv_uuids_sr[] = {{0x0201, 2}}; /**< Universally unique service identifiers. */
 
 /**@brief Callback function for asserts in the SoftDevice.
  *
@@ -179,16 +159,6 @@ static void timers_init(void)
 
     // Initialize timer module.
     APP_TIMER_INIT(APP_TIMER_PRESCALER, APP_TIMER_OP_QUEUE_SIZE, false);
-
-    // Create timers.
-
-    /* YOUR_JOB: Create any timers to be used by the application.
-                 Below is an example of how to create a timer.
-                 For every new timer needed, increase the value of the macro APP_TIMER_MAX_TIMERS by
-                 one.
-       uint32_t err_code;
-       err_code = app_timer_create(&m_app_timer_id, APP_TIMER_MODE_REPEATED, timer_timeout_handler);
-       APP_ERROR_CHECK(err_code); */
 }
 
 
@@ -210,7 +180,6 @@ static void gap_params_init(void)
                                           strlen(DEVICE_NAME));
     APP_ERROR_CHECK(err_code);
 
-    // YOUR_JOB: Use an appearance value matching the application's use case.
     err_code = sd_ble_gap_appearance_set(BLE_APPEARANCE_UNKNOWN);
     APP_ERROR_CHECK(err_code);
 
@@ -333,7 +302,7 @@ static void application_timers_start(void)
     uint32_t err_code;
     err_code = app_timer_create(&m_led_timer, APP_TIMER_MODE_REPEATED, blink_led);
     APP_ERROR_CHECK(err_code);
-    err_code = app_timer_start(m_led_timer, APP_TIMER_TICKS(500, APP_TIMER_PRESCALER), NULL);
+    err_code = app_timer_start(m_led_timer, APP_TIMER_TICKS(100, APP_TIMER_PRESCALER), NULL);
     APP_ERROR_CHECK(err_code);
 
 }
@@ -464,10 +433,6 @@ static void ble_evt_dispatch(ble_evt_t * p_ble_evt)
     on_ble_evt(p_ble_evt);
     ble_advertising_on_ble_evt(p_ble_evt);
     ble_crazyflie_on_ble_evt(&m_crazyflie, p_ble_evt);
-    /*YOUR_JOB add calls to _on_ble_evt functions from each service your application is using
-       ble_xxs_on_ble_evt(&m_xxs, p_ble_evt);
-       ble_yys_on_ble_evt(&m_yys, p_ble_evt);
-     */
 }
 
 
@@ -537,7 +502,6 @@ static void advertising_init(void)
 {
     uint32_t               err_code;
     ble_advdata_t          advdata;
-    ble_advdata_t          srdata;
     ble_adv_modes_config_t options;
 
     // Build advertising data struct to pass into @ref ble_advertising_init.
@@ -548,10 +512,6 @@ static void advertising_init(void)
     advdata.flags                   = BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE;
     advdata.uuids_more_available.uuid_cnt = sizeof(m_adv_uuids) / sizeof(m_adv_uuids[0]);
     advdata.uuids_more_available.p_uuids  = m_adv_uuids;
-
-    memset(&srdata, 0, sizeof(srdata));
-    srdata.uuids_complete.uuid_cnt = sizeof(m_adv_uuids_sr) / sizeof(m_adv_uuids_sr[0]);
-    srdata.uuids_complete.p_uuids  = m_adv_uuids_sr;
 
     memset(&options, 0, sizeof(options));
     options.ble_adv_fast_enabled  = true;
@@ -588,6 +548,7 @@ void mainLoop(void);
 int main(void)
 {
     uint32_t err_code;
+    static char address[5];
 
     sd_mbr_command(&startSdCmd);
     sd_softdevice_vector_table_base_set(BOOTLOADER_ADDRESS);
@@ -599,11 +560,17 @@ int main(void)
       start_firmware();
     }
 
+    if (NRF_POWER->GPREGRET & 0x40U) {
+        address[4] = 0xb1;
+        memcpy(&address[0], (char*)&NRF_FICR->DEVICEADDR[0], 4);
+        esbSetAddress(address);
+    }
+
+    NRF_POWER->GPREGRET &= ~(0x60U);
+
     // Initialize.
     err_code = NRF_LOG_INIT(NULL);
     APP_ERROR_CHECK(err_code);
-
-    NRF_LOG_INFO("Hello?\n");
 
     // Light up LED
     nrf_gpio_cfg_output(LED_1);
@@ -626,7 +593,6 @@ int main(void)
     APP_ERROR_CHECK(err_code);
 
     // Start execution.
-    NRF_LOG_INFO("Template started\r\n");
     application_timers_start();
     err_code = ble_advertising_start(BLE_ADV_MODE_FAST);
     APP_ERROR_CHECK(err_code);

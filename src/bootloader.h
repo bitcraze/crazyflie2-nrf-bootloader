@@ -25,6 +25,7 @@
 #define __BOOTLOADER_H__
 
 #include <stdbool.h>
+#include <stdint.h>
 #include <ble.h>
 #include "crtp.h"
 #include <nrf_mbr.h>
@@ -66,6 +67,9 @@ typedef struct {
   short flashStart;
   char  cpuId[CPUID_LEN];
   char version;
+  uint16_t version_major;
+  uint8_t version_minor;
+  uint8_t version_patch;
 } __attribute__((__packed__)) GetInfoReturns_t;
 
 /****** SetAddress ****/

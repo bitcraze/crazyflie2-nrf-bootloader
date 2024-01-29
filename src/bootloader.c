@@ -119,6 +119,9 @@ bool bootloaderProcess(CrtpPacket *packet) {
       //memcpy(info->cpuId, cpuidGetId(), CPUID_LEN);
       bzero(info->cpuId, CPUID_LEN);
       info->version = PROTOCOL_VERSION;
+      info->version_major = 2024 | 0x0000U;
+      info->version_minor = 1;
+      info->version_patch = 0;
 
       packet->datalen = 1+sizeof(GetInfoReturns_t);
 
