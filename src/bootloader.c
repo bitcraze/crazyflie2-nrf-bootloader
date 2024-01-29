@@ -123,7 +123,7 @@ bool bootloaderProcess(CrtpPacket *packet) {
       info->version_minor = 1;
       info->version_patch = 0;
 
-      packet->datalen = 1+sizeof(GetInfoReturns_t);
+      packet->datalen = 2+sizeof(GetInfoReturns_t);
 
       tx = true;
     }
