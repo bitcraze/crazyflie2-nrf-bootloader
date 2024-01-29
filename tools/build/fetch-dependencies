@@ -2,7 +2,7 @@
 #!/usr/bin/env bash
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-ROOT_DIR=$SCRIPT_DIR/..
+ROOT_DIR=$SCRIPT_DIR/../..
 pushd $ROOT_DIR
 
 mkdir -p vendor
@@ -30,6 +30,6 @@ tr -d '\r' < nrf5sdk/components/toolchain/gcc/Makefile.posix.orig > nrf5sdk/comp
 mv nrf5sdk/components/libraries/mailbox/app_mailbox.c nrf5sdk/components/libraries/mailbox/app_mailbox.c.orig
 tr -d '\r' < nrf5sdk/components/libraries/mailbox/app_mailbox.c.orig > nrf5sdk/components/libraries/mailbox/app_mailbox.c
 # Patch SDK compiler configuration
-patch -p0 < ../tools/nrf5sdk.patch
+patch -p0 < $ROOT_DIR/tools/nrf5sdk.patch
 
 popd
