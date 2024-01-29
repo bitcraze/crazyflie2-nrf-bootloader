@@ -28,3 +28,13 @@
          *p_size = size;
          p_src++;
          memcpy(p_item, p_src, size);
+
+--- nrf5sdk/components/toolchain/cmsis/include/cmsis_gcc.h
++++ nrf5sdk/components/toolchain/cmsis/include/cmsis_gcc.h
+@@ -187,5 +187,5 @@
+  */
+ __attribute__( ( always_inline ) ) __STATIC_INLINE void __set_MSP(uint32_t topOfMainStack)
+ {
+-  __ASM volatile ("MSR msp, %0\n" : : "r" (topOfMainStack) : "sp");
++  __ASM volatile ("MSR msp, %0\n" : : "r" (topOfMainStack));
+ }

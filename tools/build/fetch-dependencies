@@ -29,6 +29,8 @@ mv nrf5sdk/components/toolchain/gcc/Makefile.posix nrf5sdk/components/toolchain/
 tr -d '\r' < nrf5sdk/components/toolchain/gcc/Makefile.posix.orig > nrf5sdk/components/toolchain/gcc/Makefile.posix
 mv nrf5sdk/components/libraries/mailbox/app_mailbox.c nrf5sdk/components/libraries/mailbox/app_mailbox.c.orig
 tr -d '\r' < nrf5sdk/components/libraries/mailbox/app_mailbox.c.orig > nrf5sdk/components/libraries/mailbox/app_mailbox.c
+mv nrf5sdk/components/toolchain/cmsis/include/cmsis_gcc.h nrf5sdk/components/toolchain/cmsis/include/cmsis_gcc.h.orig
+tr -d '\r' < nrf5sdk/components/toolchain/cmsis/include/cmsis_gcc.h.orig > nrf5sdk/components/toolchain/cmsis/include/cmsis_gcc.h
 # Patch SDK compiler configuration
 patch -p0 < $ROOT_DIR/tools/nrf5sdk.patch
 
