@@ -47,4 +47,4 @@ out.write(config_struct)
 out.write(b'\xFF' * (1024 - (len(config_struct) % 1024)))
 out.close()
 
-print("Done!")
+print("Update binary saved in _build/sd130_bootloader.bin")
