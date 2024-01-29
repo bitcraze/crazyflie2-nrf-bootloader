@@ -302,7 +302,7 @@ static void application_timers_start(void)
     uint32_t err_code;
     err_code = app_timer_create(&m_led_timer, APP_TIMER_MODE_REPEATED, blink_led);
     APP_ERROR_CHECK(err_code);
-    err_code = app_timer_start(m_led_timer, APP_TIMER_TICKS(100, APP_TIMER_PRESCALER), NULL);
+    err_code = app_timer_start(m_led_timer, APP_TIMER_TICKS(500, APP_TIMER_PRESCALER), NULL);
     APP_ERROR_CHECK(err_code);
 
 }
