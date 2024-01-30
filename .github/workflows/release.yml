@@ -10,5 +10,5 @@ jobs:
     uses: bitcraze/workflows/.github/workflows/basic_release.yml@b06a0f369e637f5f5a5f83f5e86d9b1f9e173289
     with:
       builder_image: 'bitcraze/builder'
-      build_script: './build/build-update-binary'
+      build_script: './tools/build/build-update-binary'
       artifacts: '_build/sd130_bootloader.bin'
