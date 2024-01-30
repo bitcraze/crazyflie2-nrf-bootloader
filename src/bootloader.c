@@ -37,6 +37,8 @@
 #include <ble.h>
 #include <nrf_soc.h>
 
+#include "version.h"
+
 
 static char buffer[PAGE_SIZE*BUFFER_PAGES] = {0x42};
 
@@ -119,9 +121,9 @@ bool bootloaderProcess(CrtpPacket *packet) {
       //memcpy(info->cpuId, cpuidGetId(), CPUID_LEN);
       bzero(info->cpuId, CPUID_LEN);
       info->version = PROTOCOL_VERSION;
-      info->version_major = 2024 | 0x0000U;
-      info->version_minor = 1;
-      info->version_patch = 0;
+      info->version_major = VERSION_MAJOR | (VERSION_DIRTY)?0x8000U:0x000;
+      info->version_minor = VERSION_MINOR;
+      info->version_patch = VERSION_PATCH;
 
       packet->datalen = 2+sizeof(GetInfoReturns_t);
 

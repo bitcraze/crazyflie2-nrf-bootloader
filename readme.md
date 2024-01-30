@@ -25,8 +25,7 @@ This update binary can be flashed over radio like a normal firmware.
 Compiling
 ---------
 
-To compile arm-none-eabi- tools from https://launchpad.net/gcc-arm-embedded
-should be in the path.
+To compile you must hase arm-none-eabi- tools in the path, Python 3 and git.
 
 Flashing requires a jlink debug probe and nrfjprog.
 ``` bash

@@ -10,7 +10,9 @@
         "timeslot.h": "c",
         "button.h": "c",
         "ble_hci.h": "c",
-        "nrf_mbr.h": "c"
+        "nrf_mbr.h": "c",
+        "crtp.h": "c",
+        "systick.h": "c"
     },
     "cortex-debug.variableUseNaturalFormat": false
 }

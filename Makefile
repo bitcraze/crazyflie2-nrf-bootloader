@@ -163,6 +163,7 @@ INC_FOLDERS += \
   $(SDK_ROOT)/components/ble/ble_services/ble_hrs \
   $(SDK_ROOT)/components/libraries/log/src \
   $(SDK_ROOT)/components/ble/ble_services/ble_dis \
+  $(OUTPUT_DIRECTORY) \
 
 # Libraries common to all targets
 LIB_FILES += \
@@ -214,7 +215,7 @@ LDFLAGS += -Wl,--gc-sections
 LDFLAGS += --specs=nano.specs -lc -lnosys
 
 
-.PHONY: $(TARGETS) default all clean help flash flash_softdevice
+.PHONY: $(TARGETS) default all clean help flash flash_softdevice version.h
 
 # Default target - first one defined
 default: nrf51422_xxaa
@@ -251,3 +252,9 @@ flash_mbs:
 
 erase:
 	nrfjprog --eraseall -f nrf52
+
+
+$(OUTPUT_DIRECTORY)/$(TARGETS)_bootloader.c.o: version.h
+
+version.h:
+	./tools/build/generateVersionHeader.py --output _build/version.h
