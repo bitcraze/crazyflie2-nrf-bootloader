@@ -70,13 +70,13 @@ def extract_information_from_git(base):
 
 
 def generate_numeral_version():
-    vnum = version["tag"].split('+')[0].split('.')
+    vnum = version["tag"].split('+')[0].split('RC')[0].split('.')
     
     version["major"] = int(vnum[0]) if len(vnum) > 0 and vnum[0] != "NA" else 0
     version["minor"] = int(vnum[1]) if len(vnum) > 1 else 0
     version["patch"] = int(vnum[2]) if len(vnum) > 2 else 0
 
-    version["dirty"] = "true" if version["modified"] == "true" or version["tag"].find('+') >= 0 else "false"
+    version["dirty"] = "true" if version["modified"] == "true" or '+' in version["tag"] or 'RC' in version["tag"] else "false"
 
 
 if __name__ == "__main__":
@@ -95,6 +95,9 @@ if __name__ == "__main__":
     extract_information_from_git(args.crazyflie_base)
 
     generate_numeral_version()
+
+    dirtymark = '+' if version["dirty"] else ''
+    print(f'Version {version["major"]}.{version["minor"]}.{version["patch"]}{dirtymark}')
 
     with open(os.path.join(args.crazyflie_base, args.output), 'w') as fd:
         fd.writelines(
