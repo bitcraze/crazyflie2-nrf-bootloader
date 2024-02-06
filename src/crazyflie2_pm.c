@@ -3,6 +3,7 @@
 #include "nrf.h"
 #include "nrf_gpio.h"
 #include "boards.h"
+#include "platform.h"
 
 static pm_state_t m_state = PM_STATE_OFF;
 
@@ -28,24 +29,37 @@ void crazyflie2_pm_init(void) {
     // todo: setup analog measurement
 
     // Setup radio PA
-    nrf_gpio_cfg_output(RADIO_PA_RX_EN);
-    nrf_gpio_cfg_output(RADIO_PA_MODE);
-    nrf_gpio_cfg_output(RADIO_PA_ANT_SW);
+    if (platformHasRfx2411n()) {
+      // Enable RF power amplifier
+      nrf_gpio_cfg_output(RADIO_PA_RX_EN);
+      nrf_gpio_cfg_output(RADIO_PA_MODE);
+      nrf_gpio_cfg_output(RADIO_PA_ANT_SW);
+    #ifdef USE_EXT_ANTENNA
+      // Select u.FL antenna
+      nrf_gpio_pin_clear(RADIO_PA_ANT_SW);
+    #else
+      // Select chip antenna
+      nrf_gpio_pin_set(RADIO_PA_ANT_SW);
+    #endif
 
-#ifdef USE_EXT_ANTENNA
-    // Select u.FL antenna
-    nrf_gpio_pin_clear(RADIO_PA_ANT_SW);
-#else
-    // Select chip antenna
-    nrf_gpio_pin_set(RADIO_PA_ANT_SW);
-#endif
+    #ifdef RFX2411N_BYPASS_MODE
+        nrf_gpio_pin_set(RADIO_PA_MODE);
+    #else
+        nrf_gpio_pin_set(RADIO_PA_RX_EN);
+        nrf_gpio_pin_clear(RADIO_PA_MODE);
+    #endif
+    } else {
+        // Enable RF power amplifier
+        nrf_gpio_cfg_output(RADIO_PAEN_PIN);
 
-#ifdef RFX2411N_BYPASS_MODE
-    nrf_gpio_pin_set(RADIO_PA_MODE);
-#else
-    nrf_gpio_pin_set(RADIO_PA_RX_EN);
-    nrf_gpio_pin_clear(RADIO_PA_MODE);
-#endif
+    #ifdef DISABLE_PA
+        nrf_gpio_pin_clear(RADIO_PAEN_PIN);
+        nrf_gpio_cfg_output(RADIO_PATX_DIS_PIN);
+        nrf_gpio_pin_clear(RADIO_PATX_DIS_PIN);
+    #else
+        nrf_gpio_pin_set(RADIO_PAEN_PIN);
+    #endif
+    }
 
     crazyflie2_pm_set_state(PM_STATE_SYSTEM_OFF);
 }

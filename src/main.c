@@ -78,6 +78,7 @@
 #include "uart.h"
 #include "systick.h"
 #include "bootloader.h"
+#include "platform.h"
 
 #include "crtp.h"
 
@@ -549,6 +550,8 @@ int main(void)
     uint32_t err_code;
     static char address[5];
 
+    platformInitByDeviceType();
+
     sd_mbr_command(&startSdCmd);
     sd_softdevice_vector_table_base_set(BOOTLOADER_ADDRESS);
 
@@ -585,8 +588,8 @@ int main(void)
     // err_code = syslinkInit();
     // APP_ERROR_CHECK(err_code);
 
-    // crazyflie2_pm_init();
-    // crazyflie2_pm_set_state(PM_STATE_SYSTEM_ON);
+    crazyflie2_pm_init();
+    crazyflie2_pm_set_state(PM_STATE_SYSTEM_ON);
 
     err_code = app_mailbox_create(&m_uplink);
     APP_ERROR_CHECK(err_code);

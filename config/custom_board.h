@@ -50,6 +50,9 @@
 
 #define STM_NRST_PIN 21
 
+#define RADIO_PAEN_PIN 19
+#define RADIO_PATX_DIS_PIN 20
+
 // Pins if RFX2411N is used
 #define RADIO_PA_RX_EN  20
 #define RADIO_PA_ANT_SW 18

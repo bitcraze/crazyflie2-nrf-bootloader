@@ -44,6 +44,7 @@ SRC_FILES += \
   $(PROJ_DIR)/uart.c \
   $(PROJ_DIR)/bootloader.c \
   $(PROJ_DIR)/crc.c \
+  $(PROJ_DIR)/platform.c \
   $(SDK_ROOT)/external/segger_rtt/RTT_Syscalls_GCC.c \
   $(SDK_ROOT)/external/segger_rtt/SEGGER_RTT.c \
   $(SDK_ROOT)/external/segger_rtt/SEGGER_RTT_printf.c \
