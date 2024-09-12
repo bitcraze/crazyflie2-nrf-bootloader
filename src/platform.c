@@ -54,7 +54,8 @@ int platformInitByDeviceType() {
   if (0 == strcmp(deviceType, "CF20")) {
     has_rfx2411n = false;
 
-  } else if (0 == strcmp(deviceType, "CF21")) {
+} else if ((0 == strcmp(deviceType, "CF21")) ||
+           (0 == strcmp(deviceType, "C21B"))) {
     has_rfx2411n = true;
 
   } else if (0 == strcmp(deviceType, "RR10")) {
