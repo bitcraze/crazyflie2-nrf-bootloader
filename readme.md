@@ -7,10 +7,10 @@ architecture.
 
 Just after clonning the repository:
 ``` bash
-./tools/fetch_dependencies.sh
+./tools/build/fetch_dependencies
 ```
 
-This will dowsnload and patch the Nordic's nrf5 bootloader
+This will download and patch the Nordic's nrf5 bootloader
 
 Working with the bootloader
 ---------------------------
