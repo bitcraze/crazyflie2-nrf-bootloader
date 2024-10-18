@@ -5,9 +5,9 @@ from zlib import crc32
 from os import system
 
 system("arm-none-eabi-objcopy -I ihex -O binary vendor/nrf5sdk/components/softdevice/s130/hex/s130_nrf51_2.0.1_softdevice.hex _build/s130.bin")
-system("mv _build/nrf51422_xxaa.bin _build/bootloader_only_for_swd.bin")
+system("mv _build/nrf51422_xxaa.bin _build/nrf_bootloader.bin")
 
-bl = open('_build/bootloader_only_for_swd.bin', 'rb').read()
+bl = open('_build/nrf_bootloader.bin', 'rb').read()
 sd = open('_build/s130.bin', 'rb').read()
 
 # Strip the 4K MBR from the begining of the softdevice
