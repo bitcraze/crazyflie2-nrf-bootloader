@@ -11,6 +11,4 @@ jobs:
     with:
       builder_image: 'bitcraze/builder'
       build_script: './tools/build/build-update-binary'
-      artifacts: |
-        _build/sd130_bootloader.bin
-        _build/bootloader_only_for_swd.bin
+      artifacts: '_build/sd130_bootloader.bin, _build/bootloader_only_for_swd.bin'
