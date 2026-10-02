@@ -80,8 +80,14 @@ static nrf_radio_signal_callback_return_param_t * timeslot_callback(uint8_t sign
       {
           NRF_TIMER0->EVENTS_COMPARE[0] = 0;
 
-          return_param.params.extend.length_us = TIMESLOT_LEN_US;
-          return_param.callback_action         = NRF_RADIO_SIGNAL_CALLBACK_ACTION_EXTEND;
+          if (esbIsConfigDirty()) {
+              esbDeinit();
+              return_param.params.request.p_next   = &timeslot_request;
+              return_param.callback_action         = NRF_RADIO_SIGNAL_CALLBACK_ACTION_REQUEST_AND_END;
+          } else {
+              return_param.params.extend.length_us = TIMESLOT_LEN_US;
+              return_param.callback_action         = NRF_RADIO_SIGNAL_CALLBACK_ACTION_EXTEND;
+          }
       }
 
       break;

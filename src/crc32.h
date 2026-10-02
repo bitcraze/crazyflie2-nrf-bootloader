@@ -1,0 +1,33 @@
+/**
+ *    ||          ____  _ __
+ * +------+      / __ )(_) /_______________ _____  ___
+ * | 0xBC |     / __  / / __/ ___/ ___/ __ `/_  / / _ \
+ * +------+    / /_/ / / /_/ /__/ /  / /_/ / / /_/  __/
+ *  ||  ||    /_____/_/\__/\___/_/   \__,_/ /___/\___/
+ *
+ * Crazyflie 2.0 nRF51 Bootloader
+ * Copyright (c) 2026, Bitcraze AB
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 3.0 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library.
+ *
+ * crc32.h - Standard CRC-32 (ISO 3309)
+ */
+#ifndef __CRC32_H__
+#define __CRC32_H__
+
+#include <stdint.h>
+
+uint32_t crc32Calculate(const void *buffer, uint32_t size);
+
+#endif //__CRC32_H__

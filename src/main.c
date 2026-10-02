@@ -645,6 +645,7 @@ void mainLoop(void) {
   bool resetToFw = false;
   static CrtpPacket crtpPacket;
   static bool stmStarted = false;
+  bool isBroadcast = false;
 
   while (!resetToFw) {
     EsbPacket *packet;
@@ -661,9 +662,12 @@ void mainLoop(void) {
     }
 
 
+    isBroadcast = false;
+
     if (cstate != connect_ble) {
       packet = esbGetRxPacket();
       if (packet != NULL) {
+        isBroadcast = (packet->match != 0);
 
         if ( ((packet->size >= 2) &&
               (packet->data[0]==0xff) &&
@@ -672,15 +676,15 @@ void mainLoop(void) {
               (packet->data[0]==0xff) &&
               (packet->data[1]==0xfe))
            ) {
-          // Disable Bluetooth advertizing when receiving a bootloader SB packet
-          if (cstate == connect_idle) {
+          // Disable Bluetooth advertizing when receiving a unicast bootloader SB packet
+          if (!isBroadcast && cstate == connect_idle) {
             //sd_ble_gap_adv_stop();
             cstate = connect_sb;
           }
         }
 
-        // If we are connected SB, the packet is read and used
-        if (cstate == connect_sb) {
+        // If we are connected SB or receiving broadcast, process the packet
+        if (cstate == connect_sb || isBroadcast) {
           memcpy(crtpPacket.raw, packet->data, packet->size);
           crtpPacket.datalen = packet->size-1;
         }
@@ -706,13 +710,19 @@ void mainLoop(void) {
         syslinkSend(&slPacket);
 
         crtpPacket.datalen = 0xFFU;
-        // If packet received from stm32, send it back
+        // If packet received from stm32, send it back. For broadcast packets
+        // this drains stale STM32 answers, they are dropped below.
         if (syslinkReceive(&slPacket)) {
           if (slPacket.type == SYSLINK_RADIO_RAW) {
             memcpy(crtpPacket.raw, slPacket.data, slPacket.length);
             crtpPacket.datalen = slPacket.length-1;
           }
         }
+      }
+
+      // Suppress radio response for broadcast packets
+      if (isBroadcast) {
+        crtpPacket.datalen = 0xFFU;
       }
     }
     if (crtpPacket.datalen != 0xFFU) {

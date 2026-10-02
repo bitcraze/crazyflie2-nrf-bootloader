@@ -48,7 +48,7 @@ void bootloaderOnSdEvt(uint32_t evt);
 /* XXX: Protocol version has to be increased each time a command is
  * added or modified!
  */
-#define PROTOCOL_VERSION 0x10
+#define PROTOCOL_VERSION 0x11
 
 #define CPUID_LEN 12
 
@@ -79,6 +79,11 @@ typedef struct {
   char address[5];
 } __attribute__((__packed__)) SetAddressParameters_t;
 //Returns ... void
+
+/****** SetBroadcastAddress ****/
+#define CMD_SET_BROADCAST_ADDRESS 0x21
+//Parameters: same as SetAddressParameters_t (5-byte address)
+//Returns ... void (ACK only)
 
 /****** LoadBuffer ****/
 #define CMD_LOAD_BUFFER 0x14
@@ -134,7 +139,34 @@ typedef struct {
   unsigned char error;
 } __attribute__((__packed__)) FlashStatusReturns_t;
 
-/****** ReadBuffer ****/
+/****** PageCrc ******/
+#define CMD_PAGE_CRC 0x20
+//Parameters:
+typedef struct {
+  unsigned short page;
+} __attribute__((__packed__)) PageCrcParameters_t;
+//Returns:
+typedef struct {
+  unsigned short page;
+  uint32_t crc32;
+} __attribute__((__packed__)) PageCrcReturns_t;
+
+/****** RangeCrc ******/
+#define CMD_RANGE_CRC 0x22
+//Parameters: byte range counted from the start of the flash
+typedef struct {
+  uint32_t address;
+  uint32_t length;
+} __attribute__((__packed__)) RangeCrcParameters_t;
+//Returns: error 0 = OK, 1 = range outside of the flash
+typedef struct {
+  uint32_t address;
+  uint32_t length;
+  uint32_t crc32;
+  uint8_t error;
+} __attribute__((__packed__)) RangeCrcReturns_t;
+
+/****** ReadFlash ****/
 #define CMD_READ_FLASH 0x1C
 //Parameters:
 typedef struct {

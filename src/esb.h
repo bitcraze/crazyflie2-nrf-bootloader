@@ -46,6 +46,7 @@ typedef struct esbPacket_s {
   /* Written by the radio interrupt routine */
   int rssi;
   unsigned int crc;
+  uint8_t match;  /* RXMATCH: 0=unicast, 1=broadcast */
 } EsbPacket;
 
 typedef enum esbDatarate_e { esbDatarate250K=0,
@@ -93,5 +94,13 @@ void esbSetChannel(unsigned int channel);
 /* Set TX and RX radio link address */
 void esbSetAddress(char *address);
 
+/* Set the unicast address from radio order ([0] = prefix, as given to the Crazyradio) */
+void esbSetAddressRadioOrder(uint8_t *address);
+
+/* Set broadcast address (radio order) and enable broadcast reception */
+void esbSetBroadcastAddress(uint8_t *address);
+
+/* Returns true if radio config has changed and esbInit() should be called */
+bool esbIsConfigDirty(void);
 
 #endif //__ESB_H__

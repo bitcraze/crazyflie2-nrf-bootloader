@@ -38,16 +38,19 @@
 #define TXQ_LEN 4
 
 static char address[5] = {0xe7, 0xe7, 0xe7, 0xe7, 0xe7};
+static bool broadcastEnabled = false;
+static uint8_t broadcastAddress[5];
+static volatile bool configDirty = false;
 
 static enum {doTx, doRx} rs;      //Radio state
 
 static EsbPacket rxPackets[TXQ_LEN];
-static int rxq_head = 0;
-static int rxq_tail = 0;
+static volatile int rxq_head = 0;
+static volatile int rxq_tail = 0;
 
 static EsbPacket txPackets[TXQ_LEN];
-static int txq_head = 0;
-static int txq_tail = 0;
+static volatile int txq_head = 0;
+static volatile int txq_tail = 0;
 
 static EsbPacket ackPacket;
 
@@ -143,9 +146,18 @@ void esbInterruptHandler()
       pk = &rxPackets[rxq_head];
       pk->rssi = NRF_RADIO->RSSISAMPLE;
       pk->crc = NRF_RADIO->RXCRC;
+      pk->match = NRF_RADIO->RXMATCH;
 
       // If no more space available on RX queue, drop packet!
       if (((rxq_head+1)%RXQ_LEN) == rxq_tail) {
+        NRF_RADIO->TASKS_START = 1UL;
+        return;
+      }
+
+      // Broadcast packets (address 1): no ACK, go back to RX
+      if (pk->match != 0) {
+        rxq_head = ((rxq_head+1)%RXQ_LEN);
+        NRF_RADIO->PACKETPTR = (uint32_t)&rxPackets[rxq_head];
         NRF_RADIO->TASKS_START = 1UL;
         return;
       }
@@ -188,6 +200,7 @@ void esbInterruptHandler()
 
 void esbInit()
 {
+  configDirty = false;
   NRF_RADIO->POWER = 1;
 
   // Enable Radio interrupts
@@ -199,13 +212,23 @@ void esbInit()
   esbSetDatarate(esbDatarate2M);
 
   // Radio address config
-  // Using logical address 0 so only BASE0 and PREFIX0 & 0xFF are used
-  NRF_RADIO->PREFIX0 = bytewise_bit_swap(0xC4C3C200UL | address[4]);  // Prefix byte of addresses 3 to 0
+  // Logical address 0: unicast (BASE0 + PREFIX0 byte 0)
+  // Logical address 1: broadcast (BASE1 + PREFIX0 byte 1), enabled on demand
+  if (broadcastEnabled) {
+    // broadcastAddress is in radio order (as given to the Crazyradio): [0] = prefix, [1..4] = base, MSB first
+    uint32_t bcBase = (uint32_t)broadcastAddress[1]<<24 | (uint32_t)broadcastAddress[2]<<16
+                    | (uint32_t)broadcastAddress[3]<<8  | (uint32_t)broadcastAddress[4];
+    NRF_RADIO->PREFIX0 = bytewise_bit_swap(0xC4C30000UL | ((uint32_t)broadcastAddress[0] << 8) | (unsigned char)address[4]);  // Prefix byte of addresses 3 to 0
+    NRF_RADIO->BASE1   = bytewise_bit_swap(bcBase);  // Base address for prefix 1-7
+    NRF_RADIO->RXADDRESSES = 0x03UL;  // Enable device address 0 (unicast) and 1 (broadcast)
+  } else {
+    NRF_RADIO->PREFIX0 = bytewise_bit_swap(0xC4C3C200UL | address[4]);  // Prefix byte of addresses 3 to 0
+    NRF_RADIO->BASE1   = bytewise_bit_swap(0x00C2C2C2UL);  // Base address for prefix 1-7
+    NRF_RADIO->RXADDRESSES = 0x01UL;  // Enable device address 0 to use which receiving
+  }
   NRF_RADIO->PREFIX1 = bytewise_bit_swap(0xC5C6C7C8UL);  // Prefix byte of addresses 7 to 4
-  NRF_RADIO->BASE0   = bytewise_bit_swap(*(uint32_t*)address); //*(uint32_t*)&address[0];  // Base address for prefix 0
-  NRF_RADIO->BASE1   = bytewise_bit_swap(0x00C2C2C2UL);  // Base address for prefix 1-7
+  NRF_RADIO->BASE0   = bytewise_bit_swap(*(uint32_t*)address);  // Base address for prefix 0
   NRF_RADIO->TXADDRESS = 0x00UL;      // Set device address 0 to use when transmitting
-  NRF_RADIO->RXADDRESSES = 0x01UL;    // Enable device address 0 to use which receiving
 
   // Packet configuration
   NRF_RADIO->PCNF0 = (PACKET0_S1_SIZE << RADIO_PCNF0_S1LEN_Pos) |
@@ -317,3 +340,23 @@ void esbSetAddress(char *addr) {
   memcpy(address, addr, 5);
 }
 
+void esbSetAddressRadioOrder(uint8_t *addr) {
+  // address[] holds the base little-endian in [0..3] and the prefix in [4],
+  // the radio order is the reverse: [0] = prefix, [1..4] = base, MSB first
+  for (int i = 0; i < 5; i++) {
+    address[i] = addr[4 - i];
+  }
+  // Applied by esbInit() at the start of the next radio timeslot
+  configDirty = true;
+}
+
+void esbSetBroadcastAddress(uint8_t *addr) {
+  memcpy(broadcastAddress, addr, 5);
+  broadcastEnabled = true;
+  // Applied by esbInit() at the start of the next radio timeslot
+  configDirty = true;
+}
+
+bool esbIsConfigDirty(void) {
+  return configDirty;
+}
