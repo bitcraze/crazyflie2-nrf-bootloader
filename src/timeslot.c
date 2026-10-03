@@ -38,6 +38,16 @@
 
 #define TIMESLOT_LEN_US 1000
 
+// The timeslot is extended by TIMESLOT_LEN_US over and over. While Bluetooth
+// advertises, its events end the timeslot now and then and a new one is
+// requested. With advertising stopped (broadcast armed) nothing ends it, and
+// after about 100 s of continuous extensions the Crazyflie reset. So the
+// timeslot is ended and requested again after this many extensions, about
+// every 10 s, which only leaves a short gap in reception.
+#define TIMESLOT_MAX_EXTENSIONS 10000
+
+static uint32_t extensions = 0;
+
 static nrf_radio_request_t timeslot_request = {
   .request_type = NRF_RADIO_REQ_TYPE_EARLIEST,
   .params.earliest.hfclk = NRF_RADIO_HFCLK_CFG_XTAL_GUARANTEED,
@@ -55,6 +65,7 @@ static nrf_radio_signal_callback_return_param_t * timeslot_callback(uint8_t sign
   switch (signal_type)
   {
     case NRF_RADIO_CALLBACK_SIGNAL_TYPE_START:
+      extensions = 0;
       // Set up rescheduling
       NRF_TIMER0->INTENSET = (1UL << TIMER_INTENSET_COMPARE0_Pos);
       NRF_TIMER0->CC[0]    = TIMESLOT_LEN_US - 800;
@@ -80,7 +91,7 @@ static nrf_radio_signal_callback_return_param_t * timeslot_callback(uint8_t sign
       {
           NRF_TIMER0->EVENTS_COMPARE[0] = 0;
 
-          if (esbIsConfigDirty()) {
+          if (esbIsConfigDirty() || extensions >= TIMESLOT_MAX_EXTENSIONS) {
               esbDeinit();
               return_param.params.request.p_next   = &timeslot_request;
               return_param.callback_action         = NRF_RADIO_SIGNAL_CALLBACK_ACTION_REQUEST_AND_END;
@@ -103,6 +114,7 @@ static nrf_radio_signal_callback_return_param_t * timeslot_callback(uint8_t sign
       return_param.callback_action         = NRF_RADIO_SIGNAL_CALLBACK_ACTION_REQUEST_AND_END;
       break;
     case NRF_RADIO_CALLBACK_SIGNAL_TYPE_EXTEND_SUCCEEDED:
+      extensions++;
       NRF_TIMER0->CC[0]    += TIMESLOT_LEN_US;
       break;
     default:
