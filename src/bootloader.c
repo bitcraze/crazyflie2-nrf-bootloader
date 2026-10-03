@@ -138,6 +138,13 @@ bool bootloaderProcess(CrtpPacket *packet) {
 
       esbSetAddressRadioOrder((uint8_t *)addressPk->address);
     }
+    else if ((packet->data[1] == CMD_SET_CHANNEL) &&
+             (packet->datalen >= 2 + sizeof(SetChannelParameters_t)))
+    {
+      SetChannelParameters_t *params = (SetChannelParameters_t *)&packet->data[2];
+      // Not answered: the answer would go out on the new channel
+      esbChangeChannel(params->channel);
+    }
     else if (packet->data[1] == CMD_SET_BROADCAST_ADDRESS)
     {
       SetAddressParameters_t * addressPk;

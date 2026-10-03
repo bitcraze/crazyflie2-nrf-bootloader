@@ -85,6 +85,14 @@ typedef struct {
 //Parameters: same as SetAddressParameters_t (5-byte address)
 //Returns ... void (ACK only)
 
+/****** SetChannel ****/
+#define CMD_SET_CHANNEL 0x23
+//Parameters:
+typedef struct {
+  uint8_t channel;
+} __attribute__((__packed__)) SetChannelParameters_t;
+//Returns ... void (ACK only, the radio moves to the new channel right after)
+
 /****** LoadBuffer ****/
 #define CMD_LOAD_BUFFER 0x14
 //Parameters:

@@ -100,6 +100,9 @@ void esbSetAddressRadioOrder(uint8_t *address);
 /* Set broadcast address (radio order) and enable broadcast reception */
 void esbSetBroadcastAddress(uint8_t *address);
 
+/* Move to another radio channel (0-125), from the start of the next radio timeslot */
+void esbChangeChannel(uint8_t channel);
+
 /* Returns true if radio config has changed and esbInit() should be called */
 bool esbIsConfigDirty(void);
 

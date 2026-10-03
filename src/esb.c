@@ -38,6 +38,7 @@
 #define TXQ_LEN 4
 
 static char address[5] = {0xe7, 0xe7, 0xe7, 0xe7, 0xe7};
+static uint8_t channel = 0;
 static bool broadcastEnabled = false;
 static uint8_t broadcastAddress[5];
 static volatile bool configDirty = false;
@@ -208,7 +209,7 @@ void esbInit()
   NVIC_EnableIRQ(RADIO_IRQn);
   // Radio config
   NRF_RADIO->TXPOWER = (RADIO_TXPOWER_TXPOWER_0dBm << RADIO_TXPOWER_TXPOWER_Pos);
-  esbSetChannel(0);
+  esbSetChannel(channel);
   esbSetDatarate(esbDatarate2M);
 
   // Radio address config
@@ -355,6 +356,14 @@ void esbSetBroadcastAddress(uint8_t *addr) {
   broadcastEnabled = true;
   // Applied by esbInit() at the start of the next radio timeslot
   configDirty = true;
+}
+
+void esbChangeChannel(uint8_t newChannel) {
+  if (newChannel < 126) {
+    channel = newChannel;
+    // Applied by esbInit() at the start of the next radio timeslot
+    configDirty = true;
+  }
 }
 
 bool esbIsConfigDirty(void) {
