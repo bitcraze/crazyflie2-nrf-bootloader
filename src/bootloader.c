@@ -131,7 +131,8 @@ bool bootloaderProcess(CrtpPacket *packet) {
 
       tx = true;
     }
-    else if (packet->data[1] == CMD_SET_ADDRESS)
+    else if ((packet->data[1] == CMD_SET_ADDRESS) &&
+             (packet->datalen >= 2 + sizeof(SetAddressParameters_t)))
     {
       SetAddressParameters_t * addressPk;
       addressPk = (SetAddressParameters_t *)&packet->data[2];
@@ -145,7 +146,8 @@ bool bootloaderProcess(CrtpPacket *packet) {
       // Not answered: the answer would go out on the new channel
       esbChangeChannel(params->channel);
     }
-    else if (packet->data[1] == CMD_SET_BROADCAST_ADDRESS)
+    else if ((packet->data[1] == CMD_SET_BROADCAST_ADDRESS) &&
+             (packet->datalen >= 2 + sizeof(SetAddressParameters_t)))
     {
       SetAddressParameters_t * addressPk;
       addressPk = (SetAddressParameters_t *)&packet->data[2];
@@ -180,17 +182,22 @@ bool bootloaderProcess(CrtpPacket *packet) {
       packet->datalen += i;
 
       tx = true;
-    } else if (packet->data[1] == CMD_PAGE_CRC) {
+    } else if ((packet->data[1] == CMD_PAGE_CRC) &&
+               (packet->datalen >= 2 + sizeof(PageCrcParameters_t))) {
       PageCrcParameters_t *params = (PageCrcParameters_t *)&packet->data[2];
       PageCrcReturns_t *returns = (PageCrcReturns_t *)&packet->data[2];
       char *flash = (char*)FLASH_BASE;
 
+      // The page is left in place and echoed back
       if (params->page < FLASH_PAGES) {
-        returns->page = params->page;
         returns->crc32 = crc32Calculate(&flash[params->page * PAGE_SIZE], PAGE_SIZE);
-        packet->datalen = 2 + sizeof(PageCrcReturns_t);
-        tx = true;
+        returns->error = 0;
+      } else {
+        returns->crc32 = 0;
+        returns->error = 1;
       }
+      packet->datalen = 2 + sizeof(PageCrcReturns_t);
+      tx = true;
     } else if ((packet->data[1] == CMD_RANGE_CRC) &&
                (packet->datalen >= 2 + sizeof(RangeCrcParameters_t))) {
       RangeCrcParameters_t *params = (RangeCrcParameters_t *)&packet->data[2];
