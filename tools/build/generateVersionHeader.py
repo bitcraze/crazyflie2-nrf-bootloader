@@ -69,12 +69,18 @@ def extract_information_from_git(base):
         version["modified"] = "false"
 
 
+def _leading_int(s):
+    """Extract leading integer from a string, e.g. '10-test1' -> 10"""
+    import re
+    m = re.match(r'(\d+)', s)
+    return int(m.group(1)) if m else 0
+
 def generate_numeral_version():
     vnum = version["tag"].split('+')[0].split('RC')[0].split('.')
-    
-    version["major"] = int(vnum[0]) if len(vnum) > 0 and vnum[0] != "NA" else 0
-    version["minor"] = int(vnum[1]) if len(vnum) > 1 else 0
-    version["patch"] = int(vnum[2]) if len(vnum) > 2 else 0
+
+    version["major"] = _leading_int(vnum[0]) if len(vnum) > 0 and vnum[0] != "NA" else 0
+    version["minor"] = _leading_int(vnum[1]) if len(vnum) > 1 else 0
+    version["patch"] = _leading_int(vnum[2]) if len(vnum) > 2 else 0
 
     version["dirty"] = "true" if version["modified"] == "true" or '+' in version["tag"] or 'RC' in version["tag"] else "false"
 

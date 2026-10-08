@@ -30,7 +30,9 @@
 
 #include "crtp.h"
 #include "bootloader.h"
+#include "esb.h"
 #include "crc.h"
+#include "crc32.h"
 #include "systick.h"
 
 #include <nrf.h>
@@ -129,13 +131,34 @@ bool bootloaderProcess(CrtpPacket *packet) {
 
       tx = true;
     }
-/*    else if (packet->data[1] == CMD_SET_ADDRESS)
+    else if ((packet->data[1] == CMD_SET_ADDRESS) &&
+             (packet->datalen >= 2 + sizeof(SetAddressParameters_t)))
     {
       SetAddressParameters_t * addressPk;
-      addressPk = (SetAddressParameters_t *)&packet.data[1];
+      addressPk = (SetAddressParameters_t *)&packet->data[2];
 
-      esbSetAddress(addressPk->address);
-    }*/
+      esbSetAddressRadioOrder((uint8_t *)addressPk->address);
+    }
+    else if ((packet->data[1] == CMD_SET_CHANNEL) &&
+             (packet->datalen >= 2 + sizeof(SetChannelParameters_t)))
+    {
+      SetChannelParameters_t *params = (SetChannelParameters_t *)&packet->data[2];
+      // Not answered: the answer would go out on the new channel
+      esbChangeChannel(params->channel);
+    }
+    else if ((packet->data[1] == CMD_SET_BROADCAST_ADDRESS) &&
+             (packet->datalen >= 2 + sizeof(SetAddressParameters_t)))
+    {
+      SetAddressParameters_t * addressPk;
+      addressPk = (SetAddressParameters_t *)&packet->data[2];
+
+      esbSetBroadcastAddress((uint8_t *)addressPk->address);
+      // BLE advertising events cut the radio timeslot and broadcast packets
+      // sent meanwhile are lost, so stop advertising while broadcast is armed
+      sd_ble_gap_adv_stop();
+      packet->datalen = 2;
+      tx = true;
+    }
     else if (packet->data[1] == CMD_LOAD_BUFFER) {
       int i = 0;
       LoadBufferParameters_t *params = (LoadBufferParameters_t *)&packet->data[2];
@@ -158,6 +181,37 @@ bool bootloaderProcess(CrtpPacket *packet) {
 
       packet->datalen += i;
 
+      tx = true;
+    } else if ((packet->data[1] == CMD_PAGE_CRC) &&
+               (packet->datalen >= 2 + sizeof(PageCrcParameters_t))) {
+      PageCrcParameters_t *params = (PageCrcParameters_t *)&packet->data[2];
+      PageCrcReturns_t *returns = (PageCrcReturns_t *)&packet->data[2];
+      char *flash = (char*)FLASH_BASE;
+
+      // The page is left in place and echoed back
+      if (params->page < FLASH_PAGES) {
+        returns->crc32 = crc32Calculate(&flash[params->page * PAGE_SIZE], PAGE_SIZE);
+        returns->error = 0;
+      } else {
+        returns->crc32 = 0;
+        returns->error = 1;
+      }
+      packet->datalen = 2 + sizeof(PageCrcReturns_t);
+      tx = true;
+    } else if ((packet->data[1] == CMD_RANGE_CRC) &&
+               (packet->datalen >= 2 + sizeof(RangeCrcParameters_t))) {
+      RangeCrcParameters_t *params = (RangeCrcParameters_t *)&packet->data[2];
+      RangeCrcReturns_t *returns = (RangeCrcReturns_t *)&packet->data[2];
+
+      // Address and length are left in place and echoed back
+      if ((params->length <= FLASH_SIZE) && (params->address <= FLASH_SIZE - params->length)) {
+        returns->crc32 = crc32Calculate((void*)(FLASH_BASE + params->address), params->length);
+        returns->error = 0;
+      } else {
+        returns->crc32 = 0;
+        returns->error = 1;
+      }
+      packet->datalen = 2 + sizeof(RangeCrcReturns_t);
       tx = true;
     } else if (packet->data[1] == CMD_READ_FLASH) {
       int i = 0;
@@ -255,9 +309,12 @@ bool bootloaderProcess(CrtpPacket *packet) {
   }
 
   /* Flashing asynchronous work, make sure to run them when they can return
-   * data to send back
+   * data to send back. Packets for the STM32 are left alone, after a
+   * broadcast write nobody polls for the result and they would be lost.
    */
-  if ((tx == false) && (packet->datalen != 0xFFU)) {
+  bool stm32Packet = (packet->datalen != 0xFFU) && (packet->datalen >= 1) &&
+                     (packet->header == 0xFF) && (packet->data[0] == 0xFF);
+  if ((tx == false) && (packet->datalen != 0xFFU) && !stm32Packet) {
     WriteFlashReturns_t *returns = (WriteFlashReturns_t *)&packet->data[2];
     switch (bootloaderState) {
       case bootloaderFlashOk:
