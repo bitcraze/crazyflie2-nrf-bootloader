@@ -22,6 +22,27 @@ This is because the bootloader is part of the safe boot sequence of the Crazyfli
 Once a stable version of the bootloader has been produced, you can create an update binary that flashes both the bootloader and the Bluetooth softdevice.
 This update binary can be flashed over the radio like normal firmware.
 
+### Creating and flashing an update binary
+
+``` bash
+make
+./tools/generate_update_binary.py
+```
+
+This writes `_build/sd130_bootloader.bin`, which contains the bootloader, the S130 softdevice and a flag page describing where each of them goes, with their CRC32s.
+The script renames `_build/nrf51422_xxaa.bin` to `_build/nrf_bootloader.bin`, so run `make` again before generating a new update binary.
+
+The update binary is flashed with the running bootloader so that it ends just below the bootloader, overwriting the nRF51 firmware.
+On the next restart the MBS checks the flag page and the CRC32s, copies the softdevice and the bootloader into place and only then erases the flag page, so an interrupted copy is simply done again on the following restart.
+The nRF51 firmware has to be flashed again afterwards.
+
+Release archives carry the update binary as the `bootloader+softdevice` file, which the Crazyflie clients flash before the nRF51 firmware when the Crazyflie needs it.
+
+Protocol
+--------
+
+The protocol of both Crazyflie bootloaders, including the commands added in protocol version 0x11 for flashing several Crazyflies at once, is described in the readme of the [crazyflie2-stm-bootloader repository](https://github.com/bitcraze/crazyflie2-stm-bootloader).
+
 Compiling
 ---------
 

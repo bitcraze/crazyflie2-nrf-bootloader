@@ -43,6 +43,7 @@ SRC_FILES += \
   $(PROJ_DIR)/systick.c \
   $(PROJ_DIR)/uart.c \
   $(PROJ_DIR)/bootloader.c \
+  $(PROJ_DIR)/crc32.c \
   $(PROJ_DIR)/crc.c \
   $(PROJ_DIR)/platform.c \
   $(SDK_ROOT)/external/segger_rtt/RTT_Syscalls_GCC.c \
