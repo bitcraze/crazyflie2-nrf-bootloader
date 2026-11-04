@@ -58,3 +58,9 @@ Architecture
 --------
 
 Check out the readme of the [crazyflie2-stm-bootloader repository](https://github.com/bitcraze/crazyflie2-stm-bootloader) to understand the interplay between the STM and nRF bootloaders.
+
+Contribute
+--------
+Before you open a pull request, please read our [General guidelines for code contributions](https://www.bitcraze.io/development/contribute/general-guidelines/).
+
+For other ways to contribute, see the [contribute page](https://www.bitcraze.io/development/contribute/).
