@@ -120,8 +120,9 @@ bool bootloaderProcess(CrtpPacket *packet) {
       info->nBuffPages = BUFFER_PAGES;
       info->nFlashPages = FLASH_PAGES;
       info->flashStart = FLASH_START;
-      //memcpy(info->cpuId, cpuidGetId(), CPUID_LEN);
+      // The 64 bit device ID, then zeros
       bzero(info->cpuId, CPUID_LEN);
+      memcpy(info->cpuId, (uint32_t*)NRF_FICR->DEVICEID, sizeof(NRF_FICR->DEVICEID));
       info->version = PROTOCOL_VERSION;
       info->version_major = VERSION_MAJOR | ((VERSION_DIRTY)?0x8000U:0x000);
       info->version_minor = VERSION_MINOR;
